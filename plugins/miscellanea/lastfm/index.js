@@ -28,6 +28,7 @@ var compositeTitle =
             indexOfTitle: 0
         }
 
+var StationNames = ["Jazz FM"];
 var trackStartTime = 0;
 
 // Define the ControllerLastFM class
@@ -860,7 +861,7 @@ ControllerLastFM.prototype.formatScrobbleData = function (state)
     var album = state.album == null ? '' : state.album
 
     // assumes that title is always defined! This is probably true
-    if (!state.artist) {  // Artist field empty (often the case for web radio streams). 
+    if ((!state.artist) || StationNames.includes(state.artist)){  // Artist field empty (often the case for web radio streams). 
         if (state.title.indexOf(compositeTitle.separator) > -1) { // Check if the title can be split into artist and actual title:
             try {
                 var info = state.title.split(compositeTitle.separator);
