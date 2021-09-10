@@ -821,6 +821,12 @@ ControllerLastFM.prototype.checkStateUpdate = function (state) {
                     if (debugEnabled)
                         self.logger.info('[LastFM] starting new timer for ' + scrobbleThresholdInMilliseconds + ' milliseconds [' + state.artist + ' - ' + state.title + '].');
                     self.startScrobbleTimer(scrobbleThresholdInMilliseconds, state);
+                    if (state.duration == 0) {
+                        // try to update title/artist with split version
+                        state.artist = self.scrobbleData.artist;
+                        state.title = self.scrobbleData.title;
+                        self.commandRouter.servicePushState(state, 'mpd');
+                    }
                 }
 
             }
