@@ -817,18 +817,25 @@ ControllerLastFM.prototype.checkStateUpdate = function (state) {
             if (scrobbleThresholdInMilliseconds > 0) {
                 // should be the case if scrobbling from the active service has been enabled
                 if (self.formatScrobbleData(state)) { // enough metadata to be able to scrobble the track
-                    self.updateNowPlaying();
                     if (debugEnabled)
                         self.logger.info('[LastFM] starting new timer for ' + scrobbleThresholdInMilliseconds + ' milliseconds [' + state.artist + ' - ' + state.title + '].');
                     self.startScrobbleTimer(scrobbleThresholdInMilliseconds, state);
                     if (state.duration == 0) {
                         // try to update title/artist with split version
-                        state.artist = self.scrobbleData.artist;
-                        state.title = self.scrobbleData.title;
-                        self.commandRouter.servicePushState(state, 'mpd');
+                        if (debugEnabled)
+                            self.logger.info('[LastFM] Init update of webradio metadata ');                        
+                        // Wait a bit before updating (as pushed state updates mostly seem to appear in pairs, i.e. posting the same state twice
+                        setTimeout(() => {  
+                            state.artist = self.scrobbleData.artist;
+                            state.title = self.scrobbleData.title;
+                            self.previousState = state;
+                            self.commandRouter.servicePushState(state, 'mpd'); 
+                            if (debugEnabled)
+                                self.logger.info('[LastFM] Updated webradio metadata to ', state); 
+                        }, 200);
                     }
+                    self.updateNowPlaying();
                 }
-
             }
         }
         // set state as the new previous state
@@ -966,7 +973,7 @@ ControllerLastFM.prototype.updateNowPlaying = function ()
 	var defer = libQ.defer();
 	
 	if(debugEnabled)
-		self.logger.info('[LastFM] Updating now playing');
+		self.logger.info('[LastFM] Requesting update of "now playing"');
 		
     if (self.scrobblableTrack) { 
         self.updatingNowPlaying = true;
@@ -990,9 +997,12 @@ ControllerLastFM.prototype.updateNowPlaying = function ()
                         self.scrobbleData.album = result.trackInfo.album.title;
                         self.logger.info('[LastFM] Updated missing track album: ' + self.scrobbleData.album);
                     }
+                    defer.resolve();
                 }
-                else
+                else {
                     self.logger.error('[LastFM] track info request failed with error: ' + result.error);
+                    defer.reject();
+                }
             }
         });
 
