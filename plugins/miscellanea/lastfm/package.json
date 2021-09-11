@@ -1,6 +1,6 @@
 {
 	"name": "lastfm",
-	"version": "1.4.0",
+	"version": "1.5.0",
 	"description": "Installs a LastFM scrobbler which uses the Volumio artist and track info (doesn't work with librespot).",
 	"main": "index.js",
 	"scripts": {
