@@ -820,22 +820,36 @@ ControllerLastFM.prototype.checkStateUpdate = function (state) {
                     if (debugEnabled)
                         self.logger.info('[LastFM] starting new timer for ' + scrobbleThresholdInMilliseconds + ' milliseconds [' + state.artist + ' - ' + state.title + '].');
                     self.startScrobbleTimer(scrobbleThresholdInMilliseconds, state);
-                    if (state.duration == 0) {
-                        // try to update title/artist with split version
-                        if (debugEnabled)
-                            self.logger.info('[LastFM] Init update of webradio metadata ');                        
-                        // Wait a bit before updating (as pushed state updates mostly seem to appear in pairs, i.e. posting the same state twice
-                        setTimeout(() => {  
-                            state.artist = self.scrobbleData.artist;
-                            state.title = self.scrobbleData.title;
-                            self.previousState = state;
-                            self.commandRouter.servicePushState(state, 'mpd'); 
-                            if (debugEnabled)
-                                self.logger.info('[LastFM] Updated webradio metadata to ', state); 
-                        }, 200);
+//                    if (state.duration == 0) {
+//                        // try to update title/artist with split version
+//                        if (debugEnabled)
+//                            self.logger.info('[LastFM] Init update of webradio metadata ');                        
+//                        // Wait a bit before updating (as pushed state updates mostly seem to appear in pairs, i.e. posting the same state twice
+//                        // so if we update to immediately it will toggle a 2nd time between original and corrected version
+//                        setTimeout(() => {  
+//                            state.artist = self.scrobbleData.artist;
+//                            state.title = self.scrobbleData.title;
+//                            self.previousState = state;
+//                            self.commandRouter.servicePushState(state, 'mpd'); 
+////                            if (debugEnabled)
+////                                self.logger.info('[LastFM] Updated webradio metadata to ', state); 
+//                        }, 200);
                     }
-                    self.updateNowPlaying();
-                }
+                    self.updateNowPlaying().then(
+                            updated => {
+                                if (state.duration == 0){
+                                    state.artist = self.scrobbleData.artist;
+                                    state.title = self.scrobbleData.title;
+                                    if (updated) {
+                                        state.duration = self.scrobbleData.duration/1000;
+                                        state.album = self.scrobbleData.album;
+                                    }
+                                    self.previousState = state;
+                                    if (debugEnabled)
+                                        self.logger.info('[LastFM] Updated webradio using lastFM metadata to ', state); 
+                                    self.commandRouter.servicePushState(state, 'mpd');                                     
+                                }
+                            });
             }
         }
         // set state as the new previous state
@@ -987,21 +1001,24 @@ ControllerLastFM.prototype.updateNowPlaying = function ()
                 if (result.success) {
                     // Display results to start with
                     self.logger.info('[LastFM] track info: ' + JSON.stringify(result));
+                    let updated = false;
                     if (result.trackInfo.duration != undefined) {
                         if (self.scrobbleData.duration == 0) {
                             self.scrobbleData.duration = result.trackInfo.duration;
                             self.logger.info('[LastFM] Updated missing track duration: ' + result.trackInfo.duration);
+                            updated = true;
                         }
                     }
                     if (!self.scrobbleData.album && (result.trackInfo.album != undefined) && (result.trackInfo.album.title != undefined)) {
                         self.scrobbleData.album = result.trackInfo.album.title;
                         self.logger.info('[LastFM] Updated missing track album: ' + self.scrobbleData.album);
+                        updated = true;
                     }
-                    defer.resolve();
+                    defer.resolve(updated);
                 }
                 else {
                     self.logger.error('[LastFM] track info request failed with error: ' + result.error);
-                    defer.reject();
+                    defer.resolve(false);  // also use resolve here, as reaction to promise should be the same right now
                 }
             }
         });
