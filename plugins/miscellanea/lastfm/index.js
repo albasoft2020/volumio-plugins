@@ -2,7 +2,7 @@
 
 var config = new (require('v-conf'))();
 var crypto = require('crypto');
-var exec = require('child_process').exec;
+//var exec = require('child_process').exec;
 var fs = require('fs-extra');
 var http = require('http');
 var io = require('socket.io-client');
@@ -10,8 +10,8 @@ var pTimer = require('./pausableTimer');
 var socket = io.connect('http://localhost:3000');
 var lastfm = require("simple-lastfm");
 var libQ = require('kew');
-var net = require('net');
-var os = require('os');
+//var net = require('net');
+//var os = require('os');
 
 var supportedSongServices; // = ["mpd", "airplay", "volspotconnect", "volspotconnect2", "spop", "radio_paradise", "80s80s"];
 var supportedStreamingServices; // = ["webradio"];
@@ -840,14 +840,21 @@ ControllerLastFM.prototype.checkStateUpdate = function (state) {
                                 if (state.duration == 0){
                                     state.artist = self.scrobbleData.artist;
                                     state.title = self.scrobbleData.title;
+                                    let MetaData = [];
+                                    MetaData.push({tag: "Artist", value: self.scrobbleData.artist});
+                                    MetaData.push({tag: "title", value: self.scrobbleData.title});
+                                    // does not really help to reset timer; have to check how to do this
+                                    //state.seek = Math.floor(Date.now()/1000) - trackStartTime;
                                     if (updated) {
                                         state.duration = self.scrobbleData.duration/1000;
                                         state.album = self.scrobbleData.album;
+                                        if (self.scrobbleData.album) MetaData.push({tag: "Album", value: self.scrobbleData.album});
                                     }
                                     self.previousState = state;
                                     if (debugEnabled)
                                         self.logger.info('[LastFM] Updated webradio using lastFM metadata to ', state); 
-                                    self.commandRouter.servicePushState(state, 'mpd');                                     
+                                    self.commandRouter.servicePushState(state, 'mpd');           
+                                    self.commandRouter.executeOnPlugin('music_service', 'mpd', 'setMpdTrackMetaData', MetaData);
                                 }
                             });
             }
