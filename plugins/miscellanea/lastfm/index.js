@@ -108,7 +108,7 @@ ControllerLastFM.prototype.onStart = function() {
     self.currentTimer = new pTimer(self.context, debugEnabled);
 
     self.initScrobbleSettings();
-    self.initLastFMSession().then(result => {self.logger.info('[LastFM] finished init: ' + result); setTimeout(self.processScrobbleCache(), 5000);}, error => self.logger.info('[LastFM] finished init with error: ' + error) );
+    self.initLastFMSession().then(result => {self.logger.info('[LastFM] finished init: ' + result); self.processScrobbleCache();}, error => self.logger.info('[LastFM] finished init with error: ' + error) );
     self.logger.info('[LastFM] Left init routine');
  
 	self.logger.info('[LastFM] Socket already connected: ' + socket.connected);
@@ -1000,9 +1000,9 @@ ControllerLastFM.prototype.processScrobbleCache = function(data) {
                 // is an array
                 self.scrobblableTrack = true;
                 if(debugEnabled)
-                    self.logger.info('[LastFM] preparing to scrobble tracks from cache...');
+                    self.logger.info('[LastFM] preparing to scrobble ' + scrobbleCache.length + ' tracks from cache...');
                 for(var track of scrobbleCache){
-                    self.logger.info('[LastFM] Cache entry: ' + JSON.stringify(track));
+                    //self.logger.info('[LastFM] Cache entry: ' + JSON.stringify(track));
                     if (!track['album']) track['album'] = '';
                     self.scrobbleData =
                         {
@@ -1012,9 +1012,18 @@ ControllerLastFM.prototype.processScrobbleCache = function(data) {
                             duration: track['duration']
                         };
                     trackStartTime = track['timestamp'];
-                    self.logger.info('[LastFM] scrobble data: ' + JSON.stringify(self.scrobbleData)+ ', timestamp: ' + trackStartTime);
+//                    self.logger.info('[LastFM] scrobble data: ' + JSON.stringify(self.scrobbleData)+ ', timestamp: ' + trackStartTime);
                     self.scrobble();
                 }
+                // delete cache (should real check whether the scrobbling actually worked...)
+                fs.unlink(path, function (err) {
+                    if (err) {
+                        self.logger.error('[LastFM] Failed to delete the cache file...');
+                    } else {
+                        // if no error, file has been deleted successfully
+                        self.logger.info('[LastFM] Deleted the cache file...');
+                    }
+                });
             }
             else {
                 if(debugEnabled)
@@ -1025,7 +1034,6 @@ ControllerLastFM.prototype.processScrobbleCache = function(data) {
         // console.error(err)
         if(debugEnabled)
             self.logger.info('[LastFM] No scrobble cache file...');                 
-
     }
 
 	
