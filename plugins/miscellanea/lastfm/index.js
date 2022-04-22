@@ -108,7 +108,7 @@ ControllerLastFM.prototype.onStart = function() {
     self.currentTimer = new pTimer(self.context, debugEnabled);
 
     self.initScrobbleSettings();
-    self.initLastFMSession().then(result => self.logger.info('[LastFM] finished init: ' + result), error => self.logger.info('[LastFM] finished init with error: ' + error) );
+    self.initLastFMSession().then(result => {self.logger.info('[LastFM] finished init: ' + result); setTimeout(self.processScrobbleCache(), 5000);}, error => self.logger.info('[LastFM] finished init with error: ' + error) );
     self.logger.info('[LastFM] Left init routine');
  
 	self.logger.info('[LastFM] Socket already connected: ' + socket.connected);
@@ -987,6 +987,50 @@ ControllerLastFM.prototype.initLastFMSession = function () {
     return defer.promise;
 };
 
+ControllerLastFM.prototype.processScrobbleCache = function(data) {
+	var self = this;
+	
+	self.logger.info("[LastFM] Checking scrobble cache");
+    var path = '/tmp/lastFMcache.json';
+    try {
+        if (fs.existsSync(path)) {
+            //file exists
+            var scrobbleCache = fs.readJsonSync(path, { throws: false });
+            if (Array.isArray(scrobbleCache)) {
+                // is an array
+                self.scrobblableTrack = true;
+                if(debugEnabled)
+                    self.logger.info('[LastFM] preparing to scrobble tracks from cache...');
+                for(var track of scrobbleCache){
+                    self.logger.info('[LastFM] Cache entry: ' + JSON.stringify(track));
+                    if (!track['album']) track['album'] = '';
+                    self.scrobbleData =
+                        {
+                            artist: track['artist'],
+                            title: track['title'],
+                            album: track['album'],
+                            duration: track['duration']
+                        };
+                    trackStartTime = track['timestamp'];
+                    self.logger.info('[LastFM] scrobble data: ' + JSON.stringify(self.scrobbleData)+ ', timestamp: ' + trackStartTime);
+                    self.scrobble();
+                }
+            }
+            else {
+                if(debugEnabled)
+                    self.logger.info('[LastFM] Scrobble cache empty...');                 
+             }
+        }
+    } catch(err) {
+        // console.error(err)
+        if(debugEnabled)
+            self.logger.info('[LastFM] No scrobble cache file...');                 
+
+    }
+
+	
+	return libQ.resolve();
+};
 
 ControllerLastFM.prototype.updateNowPlaying = function ()
 {
