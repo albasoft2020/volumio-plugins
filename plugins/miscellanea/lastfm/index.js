@@ -28,7 +28,7 @@ var compositeTitle =
             indexOfTitle: 0
         }
 
-var StationNames = ["Jazz FM"];
+var StationNames = ["Jazz FM", "Jazz FM Premium"];
 var trackStartTime = 0;
 
 // Define the ControllerLastFM class
