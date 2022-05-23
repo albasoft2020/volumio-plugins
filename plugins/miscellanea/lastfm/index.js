@@ -719,6 +719,7 @@ ControllerLastFM.prototype.initScrobbleSettings = function ()
 {
 	var self = this;
 
+   self.updateCompositeTitleSettings(self.config.get('titleSeparator'),self.config.get('artistFirst'));
     // get the config settings in a suitable format:
     const data = {
         'supportedSongServices' : self.config.get('supportedSongServices'),
@@ -727,7 +728,7 @@ ControllerLastFM.prototype.initScrobbleSettings = function ()
         'scrobbleFromStream' :	self.config.get('scrobbleFromStream'),
         'supportedStreamingServices' : self.config.get('supportedStreamingServices'),
         'streamScrobbleThreshold' : self.config.get('streamScrobbleThreshold')
-    };
+    }    
     return self.updateServicesSettings(data);
 };
 
