@@ -12,6 +12,9 @@ var tokenExpirationTime;
 
 /**
  * CONSTRUCTOR
+ * 
+ * This plugin plays PlanetRadio stations (BauerRadio) in the UK, including Premium stations. 
+ * It is based on the hotelradio plugin.
  */
 module.exports = ControllerBauerRadio;
 
@@ -129,30 +132,30 @@ ControllerBauerRadio.prototype.loginToBauerRadio=function(username, password) {
 
     self.logger.info('Loggin in to BauerRadio');
 
-    unirest.post('https://users.hotelradio.fm/api/index/login')
-        .send('username='+username)
-        .send('password='+password)
-        .then((response)=>{
-            if(response && 
-                response.cookies && 
-                'PHPSESSID' in response.cookies && 
-                response.status === 200 &&
-                response.body &&
-                'user' in response.body &&
-                'id' in response.body['user'])
-            {
-                self.sessionId=response.cookies['PHPSESSID']
-                
-                self.userId=response.body['user']["id"]
-                self.userEmail=response.body['user']["email"]
-                
-                self.config.set("loggedin",true)
-                defer.resolve()
-            } else {
-                defer.reject()
-            }   
-        })
-
+//    unirest.post('https://users.hotelradio.fm/api/index/login')
+//        .send('username='+username)
+//        .send('password='+password)
+//        .then((response)=>{
+//            if(response && 
+//                response.cookies && 
+//                'PHPSESSID' in response.cookies && 
+//                response.status === 200 &&
+//                response.body &&
+//                'user' in response.body &&
+//                'id' in response.body['user'])
+//            {
+//                self.sessionId=response.cookies['PHPSESSID']
+//                
+//                self.userId=response.body['user']["id"]
+//                self.userEmail=response.body['user']["email"]
+//                
+//                self.config.set("loggedin",true)
+//                defer.resolve()
+//            } else {
+//                defer.reject()
+//            }   
+//        })
+    defer.resolve();
     return defer.promise
 }
 
@@ -214,7 +217,12 @@ ControllerBauerRadio.prototype.handleBrowseUri = function (curUri) {
             return this.handleRootBrowseUri();
 
         default:
-            return this.handleGroupBrowseUri(curUri);
+        {
+            if (curUri.startsWith('BauerRadio://stations')) return this.handleStationBrowseUri(curUri);
+            else //if (curUri.startsWith('BauerRadio://brands')) 
+                return this.handleGroupBrowseUri(curUri);
+//            else return this.handleGroupBrowseUri(curUri);
+        }
     }
 };
 
@@ -267,9 +275,16 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     
     groupItems.push({
         "type": "item-no-menu",
-        "title": 'Live',
+        "title": 'All Live Radio Stations',
         "albumart": '',
-        "uri": 'BauerRadio://Live'
+        "uri": 'BauerRadio://stations'
+    });
+    
+    groupItems.push({
+        "type": "item-no-menu",
+        "title": 'Brands',
+        "albumart": '',
+        "uri": 'BauerRadio://brands'
     });
 
     var browseResponse={
@@ -277,7 +292,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
             "lists": [
                 {
                     "type": "title",
-                    "title": "TRANSLATE.BAUERRADIO.GROUPS",
+                    "title": "TRANSLATE.BAUERRADIO.BRANDS",
                     "availableListViews": [
                         "grid", "list"
                     ],
@@ -286,20 +301,23 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
         }
     }
     self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
-
-    self.logger.info('[BauerRadio] Set up live station section');
-    defer.resolve(browseResponse);
+    // fetch list of stations (if needed)
+    bRadio.getLiveStations()
+        .then((response) => {
+            self.logger.info('[BauerRadio] Checked live station list. Number of stations found: ', response.size);
+            defer.resolve(browseResponse);
+        });
     return defer.promise;
-}
+};
 
-ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
+ControllerBauerRadio.prototype.handleStationBrowseUri=function(curUri) {
 
     var defer=libQ.defer();
     var self=this;
 
-    var groupId=curUri.split('/')[2];
-//    console.log(curUri, groupId);
-    self.logger.info('[BauerRadio] handleGroupBrowseUri called with: ' + curUri + ', i.e. groupid: ' + groupId);
+//    var brandID=curUri.split('/')[2];
+//    console.log(curUri, brandID);
+    self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri);
     
     var stationItems = [];
     
@@ -312,7 +330,7 @@ ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
                     "type": "webradio",
                     "title": value['name'],
                     "albumart": value['albumart'],
-                    "uri": `BauerRadio://${groupId}/${key}`,
+                    "uri": `${curUri}/${key}`,
                     "service":"bauerradio"
                 });
             });
@@ -323,7 +341,7 @@ ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
                     "lists": [
                         {
                             "type": "title",
-                            "title": "TRANSLATE.BAUERRADIO.CHANNELS",
+                            "title": "TRANSLATE.BAUERRADIO.STATIONS",
                             "availableListViews": [
                                 "grid", "list"
                             ],
@@ -333,7 +351,57 @@ ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
             };
             self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
 
-            self.logger.info('[BauerRadio] Retrieved list of live stations');
+            self.logger.info('[BauerRadio] Listed live stations');
+            defer.resolve(browseResponse);
+
+        });
+    return defer.promise;
+};
+
+ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
+
+    var defer=libQ.defer();
+    var self=this;
+
+    var brandID=curUri.split('/')[2];
+//    console.log(curUri, brandID);
+    self.logger.info('[BauerRadio] handleGroupBrowseUri called with: ' + curUri + ', i.e. groupid: ' + brandID);
+    
+    var brandItems = [];
+    
+    bRadio.getBrands()
+        .then((response) => {
+//            console.log('Live stations found: ', response.size);
+
+            response.forEach((value, key) => { 
+                brandItems.push({
+                    "type": "item-no-menu",
+//                    "uri": 'BauerRadio://brands'
+                    "title": value['name'],
+                    "albumart": value['albumart'],
+                    "uri": `BauerRadio://${brandID}/${key}`,
+//                    "service":"bauerradio"
+                });
+            });
+            
+//            console.log(stationItems[28]);
+            
+            var browseResponse={
+                "navigation": {
+                    "lists": [
+                        {
+                            "type": "title",
+                            "title": "TRANSLATE.BAUERRADIO.BRANDS",
+                            "availableListViews": [
+                                "grid", "list"
+                            ],
+                            "items": brandItems
+                        }]
+                }
+            };
+            self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
+
+            self.logger.info('[BauerRadio] Listed brands');
             defer.resolve(browseResponse);
 
         });
@@ -344,16 +412,16 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
     var defer=libQ.defer()
     var self=this
 
-    var groupId=curUri.split('/')[2];
-    var channelId= curUri.split('/')[3];
-//    self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', G: ' + groupId + ', Ch: ' + channelId);
+    var brandID=curUri.split('/')[2];
+    var stationID= curUri.split('/')[3];
+//    self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', G: ' + brandID + ', Ch: ' + stationID);
 
 //    var cookieJar = unirest.jar()
 //    cookieJar.add('PHPSESSID=' + this.sessionId, 'https://users.hotelradio.fm/api/channels/group')
 //
 //    var request = unirest.post('https://users.hotelradio.fm/api/channels/group')
 //        .jar(cookieJar)
-//        .send('id=' + groupId)
+//        .send('id=' + brandID)
 //        .then((response) => {
 //            if (response &&
 //                response.status === 200 &&
@@ -371,7 +439,7 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
 //                        }
 //
 //                response.body['channels'].map(channel => {
-//                    if(channel['id']==channelId)
+//                    if(channel['id']==stationID)
 //                    {
 //                        explodeResp['name']=channel['stream_name']
 //                        explodeResp['title']=channel['stream_name']
@@ -394,7 +462,7 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
                 "type": "track",
                 "albumart": ""
             }
-    bRadio.getStationDetails(channelId)
+    bRadio.getStationDetails(stationID)
         .then((response) => {
             explodeResp["name"] = response["name"];
             explodeResp["albumart"] = response["albumart"];
@@ -407,15 +475,15 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     var defer=libQ.defer();
     var self=this;
 
-    var groupId=curUri.split('/')[2];
-    var channelId= curUri.split('/')[3];
+    var brandID=curUri.split('/')[2];
+    var stationID= curUri.split('/')[3];
 
 //    var cookieJar = unirest.jar()
 //    cookieJar.add('PHPSESSID=' + this.sessionId, 'https://users.hotelradio.fm/api/channels/group')
 //
 //    var request = unirest.post('https://users.hotelradio.fm/api/channels/group')
 //        .jar(cookieJar)
-//        .send('id=' + groupId)
+//        .send('id=' + brandID)
 //        .then((response) => {
 //            if (response &&
 //                response.status === 200 &&
@@ -426,7 +494,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
 //                    "uri": ""
 //                }
 //                response.body['channels'].map(channel => {
-//                    if(channel['id']==channelId)
+//                    if(channel['id']==stationID)
 //                    {
 //                        if(channel["mp3128_stream_dir"] && channel['mp3128_stream_dir']!="")
 //                        {
@@ -451,7 +519,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     let explodeResp = {
         "uri": ""
     };
-    bRadio.getStationDetails(channelId)
+    bRadio.getStationDetails(stationID)
         .then((response) => {
             explodeResp["uri"] = bRadio.getStreamUrl(response);
             self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
