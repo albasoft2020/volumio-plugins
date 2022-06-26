@@ -163,18 +163,17 @@ module.exports = {
 
         var defer=libQ.defer();
         
-        let stationList = [];
-        
+        const stationList = new Map();
         this.getBrands()
                 .then((brands) => {
                     if (brands.has(key)){
                         let brand = brands.get(key);
                         brand["stations"].forEach((station) => {
                             // at this point we only need basic info about the stations, so just using the stations map is fine...
-                            stationList.push(stations.get(station));
+                            stationList.set(station, stations.get(station));
                         });
                     }
-                    console.log(stationList.length);
+//                    console.log(stationList.size);
                     defer.resolve(stationList);
                 })
                 .fail((e) => {defer.reject(); } );

@@ -219,9 +219,13 @@ ControllerBauerRadio.prototype.handleBrowseUri = function (curUri) {
         default:
         {
             if (curUri.startsWith('BauerRadio://stations')) return this.handleStationBrowseUri(curUri);
-            else //if (curUri.startsWith('BauerRadio://brands')) 
-                return this.handleGroupBrowseUri(curUri);
-//            else return this.handleGroupBrowseUri(curUri);
+            else if (curUri.startsWith('BauerRadio://brands')) {
+                if (curUri == 'BauerRadio://brands') {
+                    return this.handleBrandBrowseUri(curUri);
+                }
+                else return this.handleBrandsStationsBrowseUri(curUri);       
+            }
+//            else return thishandleBrandBrowseUri(curUri);
         }
     }
 };
@@ -358,14 +362,12 @@ ControllerBauerRadio.prototype.handleStationBrowseUri=function(curUri) {
     return defer.promise;
 };
 
-ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
+ControllerBauerRadio.prototype.handleBrandBrowseUri=function(curUri) {
 
     var defer=libQ.defer();
     var self=this;
 
-    var brandID=curUri.split('/')[2];
-//    console.log(curUri, brandID);
-    self.logger.info('[BauerRadio] handleGroupBrowseUri called with: ' + curUri + ', i.e. groupid: ' + brandID);
+    self.logger.info('[BauerRadio] handleBrandBrowseUri called with: ' + curUri);
     
     var brandItems = [];
     
@@ -379,7 +381,7 @@ ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
 //                    "uri": 'BauerRadio://brands'
                     "title": value['name'],
                     "albumart": value['albumart'],
-                    "uri": `BauerRadio://${brandID}/${key}`,
+                    "uri": `${curUri}/${key}`,
 //                    "service":"bauerradio"
                 });
             });
@@ -408,21 +410,18 @@ ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
     return defer.promise;
 };
 
-ControllerBauerRadio.prototype.handleGroupStationsBrowseUri=function(curUri) {
+ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
 
     var defer=libQ.defer();
     var self=this;
 
-//    var brandID=curUri.split('/')[2];
-//    console.log(curUri, brandID);
-    self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri);
+    let brandID=curUri.split('/').pop(); // get last element of uri
+    self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri + ', i.e. brandID: ' + brandID);
     
     var stationItems = [];
     
-    bRadio.getLiveStations()
+    bRadio.getBrandStations(brandID)
         .then((response) => {
-//            console.log('Live stations found: ', response.size);
-
             response.forEach((value, key) => { 
                 stationItems.push({
                     "type": "webradio",
@@ -432,7 +431,6 @@ ControllerBauerRadio.prototype.handleGroupStationsBrowseUri=function(curUri) {
                     "service":"bauerradio"
                 });
             });
-//            console.log(stationItems[28]);
             
             var browseResponse={
                 "navigation": {
@@ -457,49 +455,11 @@ ControllerBauerRadio.prototype.handleGroupStationsBrowseUri=function(curUri) {
 };
 
 ControllerBauerRadio.prototype.explodeUri = function(curUri) {
-    var defer=libQ.defer()
-    var self=this
+    var defer=libQ.defer();
+    var self=this;
 
-    var brandID=curUri.split('/')[2];
-    var stationID= curUri.split('/')[3];
-//    self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', G: ' + brandID + ', Ch: ' + stationID);
-
-//    var cookieJar = unirest.jar()
-//    cookieJar.add('PHPSESSID=' + this.sessionId, 'https://users.hotelradio.fm/api/channels/group')
-//
-//    var request = unirest.post('https://users.hotelradio.fm/api/channels/group')
-//        .jar(cookieJar)
-//        .send('id=' + brandID)
-//        .then((response) => {
-//            if (response &&
-//                response.status === 200 &&
-//                'channels' in response.body) {
-//
-//
-//                var explodeResp =  {
-//                            "uri": curUri,
-//                            "service": "BauerRadio",
-//                            "name": "",
-//                            "title": "",
-//                            "album": "",
-//                            "type": "track",
-//                            "albumart": "/albumart?sectionimage=music_service/BauerRadio/icons/hotelradio-icon.png"
-//                        }
-//
-//                response.body['channels'].map(channel => {
-//                    if(channel['id']==stationID)
-//                    {
-//                        explodeResp['name']=channel['stream_name']
-//                        explodeResp['title']=channel['stream_name']
-//                        explodeResp['albumart']=channel['channel_cover']
-//                    }
-//                })
-//
-//                defer.resolve([explodeResp])
-//            } else {
-//                defer.reject()
-//            }
-//        })
+    const stationID= curUri.split('/').pop();
+    self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', Ch: ' + stationID);
 
     let explodeResp =  {
                 "uri": curUri,
@@ -509,7 +469,7 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
                 "album": "",
                 "type": "track",
                 "albumart": ""
-            }
+            };
     bRadio.getStationDetails(stationID)
         .then((response) => {
             explodeResp["name"] = response["name"];
@@ -523,8 +483,8 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     var defer=libQ.defer();
     var self=this;
 
-    var brandID=curUri.split('/')[2];
-    var stationID= curUri.split('/')[3];
+//    var brandID=curUri.split('/')[2];
+    let stationID = curUri.split('/').pop();
 
 //    var cookieJar = unirest.jar()
 //    cookieJar.add('PHPSESSID=' + this.sessionId, 'https://users.hotelradio.fm/api/channels/group')
@@ -569,6 +529,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     };
     bRadio.getStationDetails(stationID)
         .then((response) => {
+            explodeResp["name"] = response["name"];
             explodeResp["uri"] = bRadio.getStreamUrl(response);
             self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
             defer.resolve(explodeResp);
