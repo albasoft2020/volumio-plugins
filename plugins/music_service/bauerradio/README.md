@@ -4,6 +4,7 @@ This Volumio plugin provides more comprehensive access to PlanetRadio (BauerRadi
 
 ### Development plan: 
 - [x] Provide station browser which also list premium channels and can play them directly from the Volumio system
+- [ ] Get more of the track metadata
 - [ ] Provide some authentication/log in mechanism to log into a Bauer user account and set permission according to subscription levels
 - [ ] Add catch-up (listen again) listings where available
 
