@@ -408,6 +408,54 @@ ControllerBauerRadio.prototype.handleGroupBrowseUri=function(curUri) {
     return defer.promise;
 };
 
+ControllerBauerRadio.prototype.handleGroupStationsBrowseUri=function(curUri) {
+
+    var defer=libQ.defer();
+    var self=this;
+
+//    var brandID=curUri.split('/')[2];
+//    console.log(curUri, brandID);
+    self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri);
+    
+    var stationItems = [];
+    
+    bRadio.getLiveStations()
+        .then((response) => {
+//            console.log('Live stations found: ', response.size);
+
+            response.forEach((value, key) => { 
+                stationItems.push({
+                    "type": "webradio",
+                    "title": value['name'],
+                    "albumart": value['albumart'],
+                    "uri": `${curUri}/${key}`,
+                    "service":"bauerradio"
+                });
+            });
+//            console.log(stationItems[28]);
+            
+            var browseResponse={
+                "navigation": {
+                    "lists": [
+                        {
+                            "type": "title",
+                            "title": "TRANSLATE.BAUERRADIO.STATIONS",
+                            "availableListViews": [
+                                "grid", "list"
+                            ],
+                            "items": stationItems
+                        }]
+                }
+            };
+            self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
+
+            self.logger.info('[BauerRadio] Listed live stations');
+            defer.resolve(browseResponse);
+
+        });
+    return defer.promise;
+};
+
 ControllerBauerRadio.prototype.explodeUri = function(curUri) {
     var defer=libQ.defer()
     var self=this

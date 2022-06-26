@@ -122,7 +122,7 @@ module.exports = {
         return defer.promise;
     },
     
-    // Get a details for selected station
+    // Get list of available brands
     getBrands: function () {
 
         var defer=libQ.defer();
@@ -148,6 +148,7 @@ module.exports = {
                         });
         //                console.log(response.body[28]);
         //                console.log(stations.get('jaz'))  
+                        lastBrandsUpdate = Date.now();
                         defer.resolve(brands);
                     } else {
                         defer.reject();
@@ -157,7 +158,30 @@ module.exports = {
         return defer.promise;
     },
     
-        // Get a details for selected station
+    // Get list of available brands
+    getBrandStations: function (key) {
+
+        var defer=libQ.defer();
+        
+        let stationList = [];
+        
+        this.getBrands()
+                .then((brands) => {
+                    if (brands.has(key)){
+                        let brand = brands.get(key);
+                        brand["stations"].forEach((station) => {
+                            // at this point we only need basic info about the stations, so just using the stations map is fine...
+                            stationList.push(stations.get(station));
+                        });
+                    }
+                    console.log(stationList.length);
+                    defer.resolve(stationList);
+                })
+                .fail((e) => {defer.reject(); } );
+        return defer.promise;
+    },
+    
+    // Get a details for selected station
     getStreamUrl: function (stationDetails) {
         
     //    var defer=libQ.defer();
