@@ -28,9 +28,7 @@ module.exports = {
         
             console.log('Requesting info through web. Include premium stations: ' + premiumUser);
             unirest
-                .post(`https://listenapi.planetradio.co.uk/api9.2/stations/gb${premium}`)
-            //  .headers({'Accept': 'application/json', 'Content-Type': 'application/json'})
-            //  .send({ "parameter": 23, "foo": "bar" })
+                .get(`https://listenapi.planetradio.co.uk/api9.2/stations/gb${premium}`)
                 .then((response) => {
                     if (response &&
                         response.status === 200) {
@@ -80,8 +78,7 @@ module.exports = {
         } else {
             console.log('Fetching details. Station in map: ', stations.has(key));
             unirest
-                .post(`https://listenapi.planetradio.co.uk/api9.2/initweb/${key}`)
-            //  .headers({'Accept': 'application/json', 'Content-Type': 'application/json'})
+                .get(`https://listenapi.planetradio.co.uk/api9.2/initweb/${key}`)
                 .then((response) => {
                     if (response && response.status === 200) {
                         let stationDetails = {
@@ -133,8 +130,7 @@ module.exports = {
         } else {
             console.log('Fetching details. Brands in map: ', brands.size);
             unirest
-                .post(`https://listenapi.planetradio.co.uk/api9.2/brands`)
-            //  .headers({'Accept': 'application/json', 'Content-Type': 'application/json'})
+                .get(`https://listenapi.planetradio.co.uk/api9.2/brands`)
                 .then((response) => {
                     if (response && response.status === 200) {
                         response.body.forEach((brand) => {
@@ -142,8 +138,8 @@ module.exports = {
                             if (brands.has(brandID)) {
                                 let updatedBrand = brands.get(brandID);
                                 updatedBrand["name"] = brand['BrandName'];
-                                updatedBrand["albumart"] = brand['BrandLogoImageUrl'];                                
-                                brands.set(brandID, updatedBrand); 
+                                updatedBrand["albumart"] = brand['BrandWhiteLogoImageUrl'];
+                                brands.set(brandID, updatedBrand);
                             }
                         });
         //                console.log(response.body[28]);
@@ -176,7 +172,7 @@ module.exports = {
 //                    console.log(stationList.size);
                     defer.resolve(stationList);
                 })
-                .fail((e) => {defer.reject(); } );
+                .fail((e) => {defer.reject(e); } );
         return defer.promise;
     },
     
@@ -206,5 +202,68 @@ module.exports = {
             }
         }
         return streamURL;
-    }
+    },
+    
+    // Get event details from URL
+    getEventDetails: function (eventUrl) {
+
+        var defer=libQ.defer();
+
+        unirest
+            .get(eventUrl)
+            .then((response) => {
+                if (response && response.status === 200) {
+                    let eventDetails = response.body;
+                    if (eventDetails.eventType == 'Song'){
+                        let song = { 
+                            'title': eventDetails.eventSongTitle,
+                            'artist' : eventDetails.eventSongArtist,
+                            'duration' : eventDetails.eventDuration,
+                            'albumart' : eventDetails.eventImageUrl,
+                            'start' : eventDetails.eventStart
+                        };
+                        defer.resolve(song);
+                    } else {
+                        defer.resolve(eventDetails);
+                    }
+                } else {
+                    defer.reject(new Error('Failed to retrieve event data from URL: ' + eventUrl));
+                }
+            });
+
+        return defer.promise;
+    },
+    
+    // Get nowPlaying details from URL
+    getNowPlaying: function (eventUrl) {
+
+        var defer=libQ.defer();
+
+        unirest
+            .get(eventUrl)
+            .header('Referer', 'https://planetradio.co.uk/')
+            .header('Origin', 'https://planetradio.co.uk/')
+            .then((response) => {
+                console.log(JSON.stringify(response));
+                if (response && response.status === 200) {
+                    // not updated yet, as not really working so far...
+                    let eventDetails = response.body;
+                    if (eventDetails.eventType == 'Song'){
+                        let song = { 
+                            'title': eventDetails.eventSongTitle,
+                            'artist' : eventDetails.eventSongArtist,
+                            'duration' : eventDetails.eventDuration,
+                            'albumart' : eventDetails.eventImageUrl,
+                            'start' : eventDetails.eventStart
+                        };
+                        defer.resolve(song);
+                    } else {
+                        defer.resolve(eventDetails);
+                    }
+                } else {
+                    defer.reject(new Error('Failed to retrieve event data from URL: ' + eventUrl));
+                }
+            });
+        return defer.promise;
+    }    
 };

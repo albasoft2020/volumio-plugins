@@ -204,7 +204,7 @@ ControllerBauerRadio.prototype.addToBrowseSources = function () {
     var self = this;
 
     self.logger.info('Adding Bauer Radio to Browse Sources');
-    var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/BauerRadio/icons/BauerPlanetRadio.jpg'};
+    var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/BauerPlanetRadio.jpg'};
     self.logger.info('[BauerRadio] Adding browse source with: ' + data);
     return self.commandRouter.volumioAddToBrowseSources(data);
 }
