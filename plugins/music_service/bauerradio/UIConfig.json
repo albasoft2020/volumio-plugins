@@ -28,7 +28,7 @@
           "element": "button",
           "label": "TRANSLATE.BAUERRADIO.FREE_TRIAL",
           "description": "TRANSLATE.BAUERRADIO.FREE_TRIAL_DESCR",
-          "onClick": {"type":"oauth", "performerUrl":"https://hotelradio.fm/en/volumio","plugin":"music_service/hotelradio", "scopes":["r_usr","w_usr","w_sub"]},
+          "onClick": {"type":"openUrl", "url":"https://planetradio.co.uk/"},
           "hidden":false
         },
         {
