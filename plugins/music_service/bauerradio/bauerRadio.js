@@ -220,7 +220,7 @@ module.exports = {
                             'artist' : eventDetails.eventSongArtist,
                             'duration' : eventDetails.eventDuration,
                             'albumart' : eventDetails.eventImageUrl,
-                            'start' : eventDetails.eventStart
+                            'timestamp' : Math.floor(new Date(eventDetails.eventStart).getTime() / 1000)
                         };
                         defer.resolve(song);
                     } else {
@@ -248,13 +248,13 @@ module.exports = {
                 if (response && response.status === 200) {
                     // not updated yet, as not really working so far...
                     let eventDetails = response.body;
-                    if (eventDetails.eventType == 'Song'){
+                    if (eventDetails.EventType == 'S'){
                         let song = { 
-                            'title': eventDetails.eventSongTitle,
-                            'artist' : eventDetails.eventSongArtist,
-                            'duration' : eventDetails.eventDuration,
-                            'albumart' : eventDetails.eventImageUrl,
-                            'start' : eventDetails.eventStart
+                            'title': eventDetails.TrackTitle,
+                            'artist' : eventDetails.ArtistName,
+                            'duration' : eventDetails.TrackDuration,
+                            'albumart' : eventDetails.ImageUrl,
+                            'start' : Math.floor(new Date(eventDetails.EventStart).getTime() / 1000)
                         };
                         defer.resolve(song);
                     } else {
@@ -265,5 +265,79 @@ module.exports = {
                 }
             });
         return defer.promise;
-    }    
+    },
+
+    loginToBauerRadio: function(username, password) {
+
+        var defer=libQ.defer();
+        
+        const targetcookiedomain1 = 'account.planetradio.co.uk';
+        const targetcookiedomain2 = 'planetradio.co.uk';
+        const target1 = 'https://account.planetradio.co.uk';
+        const target2 = 'https://account.planetradio.co.uk/user/verify/?mode=login&targeturl=https://planetradio.co.uk&postmessage=1&sitecode=1';
+        const targetstep1 = 'https://account.planetradio.co.uk/user/account/login/?mode=login&targeturl=https://planetradio.co.uk&postmessage=1&sitecode=1';
+        const targetstep2 = 'https://account.planetradio.co.uk/user/api/login/';
+        const targetrefresh = 'https://account.planetradio.co.uk//user/api/me/';
+                        
+        unirest
+            .head(target1)
+            .header('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
+         //   .header('Cache-Control', 'no-cache')
+         //        .header('referer', 'https://planetradio.co.uk/')
+            .then((response) => {
+                console.log(JSON.stringify(response));
+                if (response && response.status === 200 && response.cookies && 'PHPSESSID' in response.cookies) {
+                    // not updated yet, as not really working so far...
+                    let cookieJar=unirest.jar();
+                    let cookie = 'PHPSESSID='+response.cookies['PHPSESSID'];
+                    console.log(cookie);
+                    
+                    cookieJar.add('PHPSESSID='+response.cookies['PHPSESSID'],'account.planetradio.co.uk/');
+                    console.log(JSON.stringify(cookieJar));
+                    let request=unirest.get(targetstep1)
+                        .header('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
+                        .header('Cache-Control', 'no-cache')
+                        .jar(response.cookies)
+                        .then((response) => {
+                            console.log(JSON.stringify(response));
+                        })
+
+                    let eventDetails = response.body;
+                    defer.resolve(eventDetails);
+                } else {
+                    defer.reject(new Error('Failed to retrieve event data from URL: ' ));
+                }
+            });
+//    unirest.post('https://users.hotelradio.fm/api/index/login')
+//        .send('username='+username)
+//        .send('password='+password)
+//        .then((response)=>{
+//            if(response && 
+//                response.cookies && 
+//                'PHPSESSID' in response.cookies && 
+//                response.status === 200 &&
+//                response.body &&
+//                'user' in response.body &&
+//                'id' in response.body['user'])
+//            {
+//                self.sessionId=response.cookies['PHPSESSID']
+//                
+//                self.userId=response.body['user']["id"]
+//                self.userEmail=response.body['user']["email"]
+//                
+//                self.config.set("loggedin",true)
+//                defer.resolve()
+//            } else {
+//                defer.reject()
+//            }   
+//        })
+//        
+//        var cookieJar=unirest.jar()
+//        cookieJar.add('PHPSESSID='+self.sessionId,'https://users.hotelradio.fm/api/user/updateip')
+//
+//        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
+//            .jar(cookieJar)
+
+    return defer.promise;
+}
 };
