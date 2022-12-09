@@ -25,6 +25,7 @@ function ControllerBauerRadio(context) {
     this.commandRouter = this.context.coreCommand;
     this.logger = this.context.logger;
     this.configManager = this.context.configManager;
+    this.serviceName = 'PlanetRadio';
 }
 
 ControllerBauerRadio.prototype.getConfigurationFiles = function () {
@@ -104,6 +105,8 @@ ControllerBauerRadio.prototype.startupLogin = function () {
 //        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password'), false))
 //        .then(()=>self.registerIPAddress())
 //        .then(()=>self.addToBrowseSources())
+    // HACK
+    bRadio.setUserID(this.config.get("username"));
     self.addToBrowseSources();
 };
 
@@ -287,7 +290,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     groupItems.push({
         "type": "item-no-menu",
         "title": 'Brands',
-        "albumart": '',
+        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/BauerPlanetRadio.jpg',
         "uri": 'BauerRadio://brands'
     });
 
@@ -557,7 +560,8 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                     return self.mpdPlugin.sendMpdCommand('add "'+track.uri+'"',[]);
                 })
                 .then(function() {
-                    self.commandRouter.stateMachine.setConsumeUpdateService('mpd');
+                    // try with 'consumeIgnoreMetadata' set to true
+                    self.commandRouter.stateMachine.setConsumeUpdateService('mpd', true);
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
                 .fail(function (e) {
@@ -576,7 +580,7 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 
 ControllerBauerRadio.prototype.stop = function() {
     var self = this;
-    self.commandRouter.pushConsoleMessage('[' + Date.now() + '] ' + 'ControllerBauerRadio::stop');
+    self.logger.info('[BauerRadio] Stopped playback');
     
     return self.mpdPlugin.sendMpdCommand('stop', []);
 };
@@ -725,12 +729,12 @@ ControllerBauerRadio.prototype.logoutFromBauerRadio=function(username, password)
             }   
         })
 
-    return defer.promise
-}
+    return defer.promise;
+};
 
 ControllerBauerRadio.prototype.isLoggedIn = function () {
-    return this.config.get("loggedin", false)
-}
+    return this.config.get("loggedin", false);
+};
 
 ControllerBauerRadio.prototype.startRefreshCron=function() {
     var self=this;
@@ -745,7 +749,7 @@ ControllerBauerRadio.prototype.startRefreshCron=function() {
     });
 
     this.logger.info('AccessToken refresher cron started for Bauer Radio');
-}
+};
 
 ControllerBauerRadio.prototype.stopRefreshCron=function() {
     if(this.accessTokenRefreshCron)
@@ -755,4 +759,97 @@ ControllerBauerRadio.prototype.stopRefreshCron=function() {
     }
 
     this.logger.info('Stopping AccessToken refresher cron for Bauer	Radio');
-}
+};
+    
+ControllerBauerRadio.prototype.pushState = function (state) {
+    
+    this.logger.info('[BauerRadio] PushState called');
+};
+    
+ControllerBauerRadio.prototype.pushSongState = function (metadata) {
+    var self = this;
+    var prState = {
+        status: 'play',
+        service: self.serviceName,
+        type: 'webradio',
+//        trackType: audioFormat,
+        radioType: 'rparadise',
+        albumart: metadata.albumart,
+//        uri: flacUri,
+//        name: metadata.title,
+        title: metadata.title,
+        artist: metadata.artist,
+        album: metadata.album,
+        streaming: true,
+//        disableUiControls: true,
+        duration: metadata.duration,
+        seek: 0,
+//        samplerate: '44.1 KHz',
+//        bitdepth: '16 bit',
+        channels: 2
+    };
+
+    self.state = prState;
+
+    //workaround to allow state to be pushed when not in a volatile state
+    var vState = self.commandRouter.stateMachine.getState();
+    var queueItem = self.commandRouter.stateMachine.playQueue.arrayQueue[vState.position];
+
+    queueItem.name =  metadata.title;
+    queueItem.artist =  metadata.artist;
+//    queueItem.album = metadata.album;
+    queueItem.albumart = metadata.albumart;
+//    queueItem.trackType = 'Rparadise '+ channelMix;
+    queueItem.duration = metadata.duration;
+//    queueItem.samplerate = '44.1 KHz';
+//    queueItem.bitdepth = '16 bit';
+//    queueItem.channels = 2;
+    
+    //reset volumio internal timer
+    self.commandRouter.stateMachine.currentSeek = 0;
+    self.commandRouter.stateMachine.playbackStart=Date.now();
+    self.commandRouter.stateMachine.currentSongDuration=metadata.duration;
+    self.commandRouter.stateMachine.askedForPrefetch=false;
+    self.commandRouter.stateMachine.prefetchDone=false;
+    self.commandRouter.stateMachine.simulateStopStartDone=false;
+
+    //volumio push state
+    self.commandRouter.servicePushState(prState, self.serviceName);
+};
+
+ControllerBauerRadio.prototype.getMetadata = function (url) {
+    var self = this;
+    self.logger.info('[BauerRadio] getMetadata started with url ' + url);
+    var defer = libQ.defer();    
+    
+    bRadio.getNowPlaying(url)
+        .then(song => {
+            console.log(JSON.stringify(song));
+            bRadio.getEventDetails(song.url).then(metadata => defer.resolve(metadata));
+        })
+        .fail((err) => {
+                self.logger.info('[BauerRadio] Error: ' + err.message);
+                  defer.resolve(null);
+                self.errorToast(url, 'ERROR_STREAM_SERVER');
+            });
+    
+    return defer.promise;
+};
+
+ControllerBauerRadio.prototype.setMetadata = function (metadataUrl) {
+    var self = this;
+    return self.getMetadata(metadataUrl)
+    .then(function(metadata) {
+        if (metadata){
+            // show metadata and adjust time of playback and timer
+            if(self.apiDelay) {
+                metadata.duration = parseInt(metadata.duration) + parseInt(self.apiDelay);
+            }
+            return libQ.resolve(self.pushSongState(metadata))
+            .then(function () {
+                self.logger.info('[BauerRadio] setting new timer with duration of ' + metadata.duration + ' seconds.');
+    //            self.timer = new RPTimer(self.setMetadata.bind(self), [metadataUrl], duration);
+            });
+        }
+    });
+};

@@ -8,6 +8,7 @@ let lastBrandsUpdate = -1;
 
 let premiumUser = true;
 let preferACC = true;
+let uid = '';
 
 // ======================= START OF MODULE EXPORT
 module.exports = {
@@ -188,6 +189,7 @@ module.exports = {
                 streamURL = stationDetails['streamPremiumACC']
             else if (stationDetails['streamPremiumMP3'])
                 streamURL = stationDetails['streamPremiumMP3']
+            if (uid) streamURL += "&listenerid=" + uid;
         }
         if (streamURL == "")  {// not premiumUser or failed find premium stream
             if (preferACC && stationDetails['streamACC'])
@@ -266,7 +268,11 @@ module.exports = {
             });
         return defer.promise;
     },
-
+    
+    setUserID: function(id) {
+        return uid = id;
+    },
+    
     loginToBauerRadio: function(username, password) {
 
         var defer=libQ.defer();
