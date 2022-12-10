@@ -14,7 +14,7 @@ var tokenExpirationTime;
  * CONSTRUCTOR
  * 
  * This plugin plays PlanetRadio stations (BauerRadio) in the UK, including Premium stations. 
- * It is based on the hotelradio plugin.
+ * It is based on the hotelradio plugin as well as elements of the RadioParadise plugin.
  */
 module.exports = ControllerBauerRadio;
 
@@ -25,7 +25,10 @@ function ControllerBauerRadio(context) {
     this.commandRouter = this.context.coreCommand;
     this.logger = this.context.logger;
     this.configManager = this.context.configManager;
-    this.serviceName = 'PlanetRadio';
+    this.serviceName = 'bauerradio';
+    
+    this.previousSong = '';
+    this.currentSong = '';
 }
 
 ControllerBauerRadio.prototype.getConfigurationFiles = function () {
@@ -533,7 +536,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     bRadio.getStationDetails(stationID)
         .then((response) => {
             explodeResp["name"] = response["name"];
-            explodeResp["uri"] = bRadio.getStreamUrl(response);
+            explodeResp["uri"] = bRadio.getStreamUrl(stationID);
             self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
             defer.resolve(explodeResp);
         });
@@ -848,8 +851,32 @@ ControllerBauerRadio.prototype.setMetadata = function (metadataUrl) {
             return libQ.resolve(self.pushSongState(metadata))
             .then(function () {
                 self.logger.info('[BauerRadio] setting new timer with duration of ' + metadata.duration + ' seconds.');
-    //            self.timer = new RPTimer(self.setMetadata.bind(self), [metadataUrl], duration);
+    //            self.timer = new PRTimer(self.setMetadata.bind(self), [metadataUrl], duration);
             });
         }
     });
+};
+
+
+function PRTimer(callback, args, delay) {
+    var start, remaining = delay;
+
+    var nanoTimer = new NanoTimer();
+
+    PRTimer.prototype.pause = function () {
+        nanoTimer.clearTimeout();
+        remaining -= new Date() - start;
+    };
+
+    PRTimer.prototype.resume = function () {
+        start = new Date();
+        nanoTimer.clearTimeout();
+        nanoTimer.setTimeout(callback, args, remaining + 'm');
+    };
+
+    PRTimer.prototype.clear = function () {
+        nanoTimer.clearTimeout();
+    };
+
+    this.resume();
 };

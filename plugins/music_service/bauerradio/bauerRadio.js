@@ -2,6 +2,10 @@
 var unirest=require('unirest');
 var libQ=require('kew');
 
+const premiumStreamBase = 'https://stream.on.revma.com';
+const NowPlayingPremiumUrl = new URL('https://stream.on.revma.com/api/user/command/now_playing');
+const NowPlayingUrl = 'https://listenapi.planetradio.co.uk/api9.2/nowplaying';
+
 const stations = new Map();
 const brands = new Map();
 let lastBrandsUpdate = -1;
@@ -9,7 +13,11 @@ let lastBrandsUpdate = -1;
 let premiumUser = true;
 let preferACC = true;
 let uid = '';
+let currentPlayingURL = '';
+let realTimeNowPlaying = '';
+let currentNowPlaying = '';
 
+//premiumUser = false;
 // ======================= START OF MODULE EXPORT
 module.exports = {
 // ======================= Tools (called from outside)
@@ -178,10 +186,10 @@ module.exports = {
     },
     
     // Get a details for selected station
-    getStreamUrl: function (stationDetails) {
+    getStreamUrl: function (stationKey) {
         
     //    var defer=libQ.defer();
-                
+        let stationDetails = stations.get(stationKey);       
         let streamURL = "";
 
         if (premiumUser) {
@@ -203,7 +211,28 @@ module.exports = {
                 streamURL += "&aw_0_1st.playerid=BMUK_html5&aw_0_1st.skey=" + Math.round(Date.now()/1e3);
             }
         }
+        this.setNowPlayingURL(streamURL, stationKey);
         return streamURL;
+    },
+    
+    setNowPlayingURL: function(streamUrl, stationKey) {
+        
+        currentPlayingURL = streamUrl; 
+        if (streamUrl.startsWith(premiumStreamBase) && uid) {
+            const url = new URL(streamUrl);
+            console.log('Stream ID: ', url.pathname.slice(1) , ' , Search: ' , url.search);
+        
+            const searchParams = new URLSearchParams({stream: url.pathname.slice(1), uid: uid});
+            
+            NowPlayingPremiumUrl.search = searchParams.toString();
+            realTimeNowPlaying = NowPlayingPremiumUrl.href;
+            currentNowPlaying = NowPlayingPremiumUrl.href;
+        } else {
+            realTimeNowPlaying = '';
+            currentNowPlaying = NowPlayingUrl +'/' + stationKey;
+        }
+        console.log('Now playing URL: ' , currentNowPlaying, ', real time: ', !(realTimeNowPlaying==''));
+        return streamUrl;
     },
     
     // Get event details from URL
@@ -218,8 +247,8 @@ module.exports = {
                     let eventDetails = response.body;
                     if (eventDetails.eventType == 'Song'){
                         let song = { 
-                            'title': eventDetails.eventSongTitle,
                             'artist' : eventDetails.eventSongArtist,
+                            'title': eventDetails.eventSongTitle,
                             'duration' : eventDetails.eventDuration,
                             'albumart' : eventDetails.eventImageUrl,
                             'timestamp' : Math.floor(new Date(eventDetails.eventStart).getTime() / 1000)
@@ -236,8 +265,24 @@ module.exports = {
         return defer.promise;
     },
     
+    nowPlaying: function () {
+        let defer=libQ.defer();
+        
+        if (realTimeNowPlaying) {
+            this.getNowPlayingDetails(realTimeNowPlaying)
+                .then(song => {
+//                    console.log(JSON.stringify(song));
+                    this.getEventDetails(song.url).then(song => {console.log(JSON.stringify(song)); defer.resolve(song);});
+                });
+        } else {
+            this.getNowPlayingDetails(currentNowPlaying)
+                .then(song => {console.log(JSON.stringify(song)); defer.resolve(song);});
+        }
+        return defer.promise;
+    },
+    
     // Get nowPlaying details from URL
-    getNowPlaying: function (eventUrl) {
+    getNowPlayingDetails: function (eventUrl) {
 
         var defer=libQ.defer();
 
@@ -252,11 +297,11 @@ module.exports = {
                     let eventDetails = response.body;
                     if (eventDetails.EventType == 'S'){
                         let song = { 
-                            'title': eventDetails.TrackTitle,
                             'artist' : eventDetails.ArtistName,
+                            'title': eventDetails.TrackTitle,
                             'duration' : eventDetails.TrackDuration,
                             'albumart' : eventDetails.ImageUrl,
-                            'start' : Math.floor(new Date(eventDetails.EventStart).getTime() / 1000)
+                            'timestamp' : Math.floor(new Date(eventDetails.EventStart).getTime() / 1000)
                         };
                         defer.resolve(song);
                     } else {
