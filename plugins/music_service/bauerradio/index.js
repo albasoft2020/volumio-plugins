@@ -5,6 +5,7 @@ var ip = require('public-ip');
 var fs=require('fs-extra');
 var cron = require('node-schedule');
 var moment=require('moment');
+var NanoTimer = require('nanotimer');
 
 var bRadio = require('./bauerRadio');  // BauerRadio specific code
 
@@ -565,8 +566,10 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                 .then(function() {
                     // try with 'consumeIgnoreMetadata' set to true
                     self.commandRouter.stateMachine.setConsumeUpdateService('mpd', true);
+//                    self.commandRouter.stateMachine.setConsumeUpdateService(this.serviceName);
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
+                .then(() => setTimeout(self.setMetadata.bind(self), 1000))
                 .fail(function (e) {
                     self.logger.error('Could not Clear and Play BauerRadio Track: ' + e);
                     defer.reject(new Error());
@@ -773,10 +776,11 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata) {
     var self = this;
     var prState = {
         status: 'play',
-        service: self.serviceName,
+//        service: self.serviceName,
+        service: 'mpd',
         type: 'webradio',
 //        trackType: audioFormat,
-        radioType: 'rparadise',
+        radioType: 'bauerradio',
         albumart: metadata.albumart,
 //        uri: flacUri,
 //        name: metadata.title,
@@ -817,7 +821,8 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata) {
     self.commandRouter.stateMachine.simulateStopStartDone=false;
 
     //volumio push state
-    self.commandRouter.servicePushState(prState, self.serviceName);
+//    self.commandRouter.servicePushState(prState, self.serviceName);
+    self.commandRouter.servicePushState(prState, 'mpd');
 };
 
 ControllerBauerRadio.prototype.getMetadata = function (url) {
@@ -825,24 +830,24 @@ ControllerBauerRadio.prototype.getMetadata = function (url) {
     self.logger.info('[BauerRadio] getMetadata started with url ' + url);
     var defer = libQ.defer();    
     
-    bRadio.getNowPlaying(url)
-        .then(song => {
-            console.log(JSON.stringify(song));
-            bRadio.getEventDetails(song.url).then(metadata => defer.resolve(metadata));
-        })
-        .fail((err) => {
-                self.logger.info('[BauerRadio] Error: ' + err.message);
-                  defer.resolve(null);
-                self.errorToast(url, 'ERROR_STREAM_SERVER');
-            });
-    
+    var vState = self.commandRouter.stateMachine.getState();
+    self.logger.info('[BauerRadio] Volumio state ' + JSON.stringify(vState));
+    if (bRadio.realTimeNowPlaying()){
+        bRadio.nowPlaying()
+            .then(song => defer.resolve(song));
+    } else {
+        self.logger.info('[BauerRadio] Still to be done');     
+        defer.resolve(vState);
+    }    
     return defer.promise;
 };
 
-ControllerBauerRadio.prototype.setMetadata = function (metadataUrl) {
-    var self = this;
-    return self.getMetadata(metadataUrl)
+ControllerBauerRadio.prototype.setMetadata = function () {
+    let self = this;
+    
+    return self.getMetadata()
     .then(function(metadata) {
+        self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
         if (metadata){
             // show metadata and adjust time of playback and timer
             if(self.apiDelay) {
@@ -851,7 +856,7 @@ ControllerBauerRadio.prototype.setMetadata = function (metadataUrl) {
             return libQ.resolve(self.pushSongState(metadata))
             .then(function () {
                 self.logger.info('[BauerRadio] setting new timer with duration of ' + metadata.duration + ' seconds.');
-    //            self.timer = new PRTimer(self.setMetadata.bind(self), [metadataUrl], duration);
+                self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], 10000);
             });
         }
     });

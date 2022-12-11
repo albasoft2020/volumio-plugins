@@ -281,6 +281,10 @@ module.exports = {
         return defer.promise;
     },
     
+    realTimeNowPlaying: function () {
+        return !(this.realTimeNowPlaying == '')
+    },
+    
     // Get nowPlaying details from URL
     getNowPlayingDetails: function (eventUrl) {
 
