@@ -288,7 +288,7 @@ module.exports = {
     },
     
     realTimeNowPlaying: function () {
-        return !(this.realTimeNowPlaying == '')
+        return !(realTimeNowPlaying == '')
     },
     
     // Get nowPlaying details from URL
@@ -305,7 +305,7 @@ module.exports = {
                 if (response && response.status === 200) {
                     // not updated yet, as not really working so far...
                     let eventDetails = response.body;
-                    if (eventDetails.EventType == 'S'){
+                    if ((eventDetails.EventType == 'S')  || (eventDetails.EventType == '0')){
                         let song = { 
                             'artist' : eventDetails.ArtistName,
                             'title': eventDetails.TrackTitle,

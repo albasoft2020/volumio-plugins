@@ -11,6 +11,8 @@ var bRadio = require('./bauerRadio');  // BauerRadio specific code
 
 var tokenExpirationTime;
 
+const nowPlayingRefresh = 10000;  // time in ms
+
 /**
  * CONSTRUCTOR
  * 
@@ -30,6 +32,7 @@ function ControllerBauerRadio(context) {
     
     this.previousSong = '';
     this.currentSong = '';
+    this.state = {artist: '', title: ''};
 }
 
 ControllerBauerRadio.prototype.getConfigurationFiles = function () {
@@ -774,6 +777,14 @@ ControllerBauerRadio.prototype.pushState = function (state) {
     
 ControllerBauerRadio.prototype.pushSongState = function (metadata) {
     var self = this;
+    let seek = 0;
+    let ts = Date.now();
+    
+    if (metadata.timestamp){
+        seek = (ts - metadata.timestamp * 1000);
+        ts = metadata.timestamp * 1000;
+    }
+    
     var prState = {
         status: 'play',
 //        service: self.serviceName,
@@ -790,7 +801,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata) {
         streaming: true,
 //        disableUiControls: true,
         duration: metadata.duration,
-        seek: 0,
+        seek: seek,
 //        samplerate: '44.1 KHz',
 //        bitdepth: '16 bit',
         channels: 2
@@ -813,8 +824,8 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata) {
 //    queueItem.channels = 2;
     
     //reset volumio internal timer
-    self.commandRouter.stateMachine.currentSeek = 0;
-    self.commandRouter.stateMachine.playbackStart=Date.now();
+    self.commandRouter.stateMachine.currentSeek = seek;
+    self.commandRouter.stateMachine.playbackStart=ts;
     self.commandRouter.stateMachine.currentSongDuration=metadata.duration;
     self.commandRouter.stateMachine.askedForPrefetch=false;
     self.commandRouter.stateMachine.prefetchDone=false;
@@ -825,20 +836,54 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata) {
     self.commandRouter.servicePushState(prState, 'mpd');
 };
 
-ControllerBauerRadio.prototype.getMetadata = function (url) {
+ControllerBauerRadio.prototype.getMetadata = function () {
     var self = this;
-    self.logger.info('[BauerRadio] getMetadata started with url ' + url);
     var defer = libQ.defer();    
     
-    var vState = self.commandRouter.stateMachine.getState();
-    self.logger.info('[BauerRadio] Volumio state ' + JSON.stringify(vState));
-    if (bRadio.realTimeNowPlaying()){
-        bRadio.nowPlaying()
-            .then(song => defer.resolve(song));
-    } else {
-        self.logger.info('[BauerRadio] Still to be done');     
-        defer.resolve(vState);
-    }    
+    self.logger.info('[BauerRadio] getMetadata started');
+//    var vState = self.commandRouter.stateMachine.getState();
+    
+//    let mState = self.mpdPlugin.getState();
+//    self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
+    
+//    if ((mState.title == self.currentSong)){
+//        defer.resolve({unchanged: true});
+//    } else {
+//        self.currentSong = mState.title;
+        if (bRadio.realTimeNowPlaying()){
+            bRadio.nowPlaying()
+                .then(song => {
+                    if ((song.title == self.state.title) && (song.artist == self.state.artist)) {
+                        defer.resolve({unchanged: true});
+                    } else {
+                        defer.resolve(song);
+                    }
+                });
+        } else {
+            self.logger.info('[BauerRadio] Still to be done');
+            self.mpdPlugin.getState()
+                .then(mState => {
+                    self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
+                    if (mState.title.startsWith('https://listenapi.planetradio.co.uk')){
+                        if (self.currentSong == mState.title) {
+                            defer.resolve({unchanged: true});
+                        } else {
+                            self.logger.info('[BauerRadio] Try to retrieve metadata');
+                            bRadio.getEventDetails(mState.title)
+                                .then(song => {
+                                    self.currentSong = mState.title;
+                                    self.logger.info('[BauerRadio] metadata: ' + JSON.stringify(song));
+                                    self.logger.info('[BauerRadio] Pass on metadata');
+                                    defer.resolve(song);
+                                });
+                        }
+                    } else {
+                        defer.resolve(mState);
+                    }
+                })
+//                .fail(defer.resolve(self.state));
+        }    
+//    }
     return defer.promise;
 };
 
@@ -849,16 +894,23 @@ ControllerBauerRadio.prototype.setMetadata = function () {
     .then(function(metadata) {
         self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
         if (metadata){
-            // show metadata and adjust time of playback and timer
-            if(self.apiDelay) {
-                metadata.duration = parseInt(metadata.duration) + parseInt(self.apiDelay);
+            if(metadata.unchanged) {
+                self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], nowPlayingRefresh);
+                return;
             }
-            return libQ.resolve(self.pushSongState(metadata))
-            .then(function () {
-                self.logger.info('[BauerRadio] setting new timer with duration of ' + metadata.duration + ' seconds.');
-                self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], 10000);
-            });
-        }
+            else {
+                return libQ.resolve(self.pushSongState(metadata))
+                .then(function () {
+                    self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                    self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], nowPlayingRefresh);
+                });
+            }
+        };
+    })
+    .fail(() => {
+        self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+        self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], nowPlayingRefresh);
     });
 };
 
