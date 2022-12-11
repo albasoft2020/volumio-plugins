@@ -271,12 +271,18 @@ module.exports = {
         if (realTimeNowPlaying) {
             this.getNowPlayingDetails(realTimeNowPlaying)
                 .then(song => {
-//                    console.log(JSON.stringify(song));
-                    this.getEventDetails(song.url).then(song => {console.log(JSON.stringify(song)); defer.resolve(song);});
+                    this.getEventDetails(song.url)
+                        .then(song => {
+//                            console.log(JSON.stringify(song)); 
+                            defer.resolve(song);
+                        });
                 });
         } else {
             this.getNowPlayingDetails(currentNowPlaying)
-                .then(song => {console.log(JSON.stringify(song)); defer.resolve(song);});
+                .then(song => {
+//                    console.log(JSON.stringify(song)); 
+                    defer.resolve(song);
+                });
         }
         return defer.promise;
     },
@@ -295,7 +301,7 @@ module.exports = {
             .header('Referer', 'https://planetradio.co.uk/')
             .header('Origin', 'https://planetradio.co.uk/')
             .then((response) => {
-                console.log(JSON.stringify(response));
+//                console.log(JSON.stringify(response));
                 if (response && response.status === 200) {
                     // not updated yet, as not really working so far...
                     let eventDetails = response.body;
