@@ -214,7 +214,7 @@ ControllerBauerRadio.prototype.addToBrowseSources = function () {
     var self = this;
 
     self.logger.info('Adding Bauer Radio to Browse Sources');
-    var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/BauerPlanetRadio.jpg'};
+    var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.svg'};
     self.logger.info('[BauerRadio] Adding browse source with: ' + data);
     return self.commandRouter.volumioAddToBrowseSources(data);
 }
@@ -297,7 +297,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     groupItems.push({
         "type": "item-no-menu",
         "title": 'Brands',
-        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/BauerPlanetRadio.jpg',
+        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.svg',
         "uri": 'BauerRadio://brands'
     });
 
@@ -572,7 +572,7 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 //                    self.commandRouter.stateMachine.setConsumeUpdateService(this.serviceName);
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
-                .then(() => setTimeout(self.setMetadata.bind(self), 1000))
+                .then(() => setTimeout(self.setMetadata.bind(self), 1000, 'play'))
                 .fail(function (e) {
                     self.logger.error('Could not Clear and Play BauerRadio Track: ' + e);
                     defer.reject(new Error());
@@ -590,7 +590,10 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 ControllerBauerRadio.prototype.stop = function() {
     var self = this;
     self.logger.info('[BauerRadio] Stopped playback');
-    
+    if (self.timer) {
+        self.logger.info('[BauerRadio] Stopping timer');
+        self.timer.clear();
+    }
     return self.mpdPlugin.sendMpdCommand('stop', []);
 };
 
@@ -774,8 +777,13 @@ ControllerBauerRadio.prototype.pushState = function (state) {
     
     this.logger.info('[BauerRadio] PushState called');
 };
+
+ControllerBauerRadio.prototype.getState = function () {
     
-ControllerBauerRadio.prototype.pushSongState = function (metadata) {
+    this.logger.info('[BauerRadio] getState called');
+};
+ 
+ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     var self = this;
     let seek = 0;
     let ts = Date.now();
@@ -786,12 +794,12 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata) {
     }
     
     var prState = {
-        status: 'play',
+        status: status,
 //        service: self.serviceName,
         service: 'mpd',
-        type: 'webradio',
-//        trackType: audioFormat,
-        radioType: 'bauerradio',
+//        type: 'webradio',
+        trackType: 'aac',
+//        radioType: 'bauerradio',
         albumart: metadata.albumart,
 //        uri: flacUri,
 //        name: metadata.title,
@@ -860,7 +868,6 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                     }
                 });
         } else {
-            self.logger.info('[BauerRadio] Still to be done');
             self.mpdPlugin.getState()
                 .then(mState => {
                     self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
@@ -878,6 +885,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                                 });
                         }
                     } else {
+                        if (mState.title.startsWith('playlist.m3u8')) mState.title = 'Default title';
                         defer.resolve(mState);
                     }
                 })
@@ -887,7 +895,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
     return defer.promise;
 };
 
-ControllerBauerRadio.prototype.setMetadata = function () {
+ControllerBauerRadio.prototype.setMetadata = function (playState) {
     let self = this;
     
     return self.getMetadata()
@@ -896,21 +904,21 @@ ControllerBauerRadio.prototype.setMetadata = function () {
         if (metadata){
             if(metadata.unchanged) {
                 self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-                self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], nowPlayingRefresh);
+                if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
                 return;
             }
             else {
-                return libQ.resolve(self.pushSongState(metadata))
+                return libQ.resolve(self.pushSongState(metadata, playState))
                 .then(function () {
                     self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-                    self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], nowPlayingRefresh);
+                    if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
                 });
             }
         };
     })
     .fail(() => {
         self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-        self.timer = new PRTimer(self.setMetadata.bind(self), ['dummy'], nowPlayingRefresh);
+        if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
     });
 };
 
