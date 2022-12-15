@@ -328,7 +328,11 @@ module.exports = {
         return uid = id;
     },
     
-    loginToBauerRadio: function(username, password) {
+    setPremium: function(premium) {
+        return premiumUser = premium;
+    },
+    
+ loginToBauerRadio: function(username, password) {
 
         var defer=libQ.defer();
         

@@ -12,7 +12,13 @@ var bRadio = require('./bauerRadio');  // BauerRadio specific code
 var tokenExpirationTime;
 
 const nowPlayingRefresh = 10000;  // time in ms
-
+// Settings for splitting composite titles (as used for many webradio streams)
+const compositeTitle =
+        {
+            separator: " - ",
+            indexOfArtist: 1,
+            indexOfTitle: 0
+        }
 /**
  * CONSTRUCTOR
  * 
@@ -24,15 +30,18 @@ module.exports = ControllerBauerRadio;
 function ControllerBauerRadio(context) {
 	var self=this;
 
-    this.context = context;
-    this.commandRouter = this.context.coreCommand;
-    this.logger = this.context.logger;
-    this.configManager = this.context.configManager;
-    this.serviceName = 'bauerradio';
+    self.context = context;
+    self.commandRouter = this.context.coreCommand;
+    self.logger = this.context.logger;
+    self.configManager = this.context.configManager;
+    self.serviceName = 'bauerradio';
     
-    this.previousSong = '';
-    this.currentSong = '';
-    this.state = {artist: '', title: ''};
+    self.updateService = 'mpd';
+    self.currentStation;
+    
+    self.previousSong = '';
+    self.currentSong = '';
+    self.state = {artist: '', title: ''};
 }
 
 ControllerBauerRadio.prototype.getConfigurationFiles = function () {
@@ -112,6 +121,8 @@ ControllerBauerRadio.prototype.startupLogin = function () {
 //        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password'), false))
 //        .then(()=>self.registerIPAddress())
 //        .then(()=>self.addToBrowseSources())
+    // HACK
+    bRadio.setPremium(this.config.get("password"));
     // HACK
     bRadio.setUserID(this.config.get("username"));
     self.addToBrowseSources();
@@ -540,6 +551,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     bRadio.getStationDetails(stationID)
         .then((response) => {
             explodeResp["name"] = response["name"];
+            explodeResp["albumart"] = response["albumart"];
             explodeResp["uri"] = bRadio.getStreamUrl(stationID);
             self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
             defer.resolve(explodeResp);
@@ -568,8 +580,9 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                 })
                 .then(function() {
                     // try with 'consumeIgnoreMetadata' set to true
-                    self.commandRouter.stateMachine.setConsumeUpdateService('mpd', true);
+                    self.commandRouter.stateMachine.setConsumeUpdateService(self.updateService, true);
 //                    self.commandRouter.stateMachine.setConsumeUpdateService(this.serviceName);
+                    self.currentStation = track;
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
                 .then(() => setTimeout(self.setMetadata.bind(self), 1000, 'play'))
@@ -594,7 +607,7 @@ ControllerBauerRadio.prototype.stop = function() {
         self.logger.info('[BauerRadio] Stopping timer');
         self.timer.clear();
     }
-    return self.mpdPlugin.sendMpdCommand('stop', []);
+    return self.mpdPlugin.sendMpdCommand('stop', []).then(self.setMetadata('stop'));
 };
 
 ControllerBauerRadio.prototype.getUIConfig = function () {
@@ -796,7 +809,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     var prState = {
         status: status,
 //        service: self.serviceName,
-        service: 'mpd',
+        service: this.updateService,
 //        type: 'webradio',
         trackType: 'aac',
 //        radioType: 'bauerradio',
@@ -841,7 +854,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
 
     //volumio push state
 //    self.commandRouter.servicePushState(prState, self.serviceName);
-    self.commandRouter.servicePushState(prState, 'mpd');
+    self.commandRouter.servicePushState(prState, this.updateService);
 };
 
 ControllerBauerRadio.prototype.getMetadata = function () {
@@ -849,15 +862,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
     var defer = libQ.defer();    
     
     self.logger.info('[BauerRadio] getMetadata started');
-//    var vState = self.commandRouter.stateMachine.getState();
-    
-//    let mState = self.mpdPlugin.getState();
-//    self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
-    
-//    if ((mState.title == self.currentSong)){
-//        defer.resolve({unchanged: true});
-//    } else {
-//        self.currentSong = mState.title;
+
         if (bRadio.realTimeNowPlaying()){
             bRadio.nowPlaying()
                 .then(song => {
@@ -870,23 +875,41 @@ ControllerBauerRadio.prototype.getMetadata = function () {
         } else {
             self.mpdPlugin.getState()
                 .then(mState => {
-                    self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
-                    if (mState.title.startsWith('https://listenapi.planetradio.co.uk')){
-                        if (self.currentSong == mState.title) {
+                    if (self.currentSong == mState.title) {
                             defer.resolve({unchanged: true});
-                        } else {
-                            self.logger.info('[BauerRadio] Try to retrieve metadata');
-                            bRadio.getEventDetails(mState.title)
-                                .then(song => {
-                                    self.currentSong = mState.title;
-                                    self.logger.info('[BauerRadio] metadata: ' + JSON.stringify(song));
-                                    self.logger.info('[BauerRadio] Pass on metadata');
-                                    defer.resolve(song);
-                                });
-                        }
                     } else {
-                        if (mState.title.startsWith('playlist.m3u8')) mState.title = 'Default title';
-                        defer.resolve(mState);
+                        self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
+                        if (mState.title.startsWith('https://listenapi.planetradio.co.uk')){
+                                self.logger.info('[BauerRadio] Try to retrieve metadata');
+                                bRadio.getEventDetails(mState.title)
+                                    .then(song => {
+                                        self.currentSong = mState.title;
+                                        self.logger.info('[BauerRadio] metadata: ' + JSON.stringify(song));
+                                        self.logger.info('[BauerRadio] Pass on metadata');
+                                        defer.resolve(song);
+                                    });
+                        } else {
+                            mState.albumart = self.currentStation.albumart;
+                            self.currentSong = mState.title;
+                            if (mState.title.startsWith('playlist.m3u8')) mState.title = self.currentStation.name;
+                            else {
+                                if (mState.title.indexOf(compositeTitle.separator) > -1) { // Check if the title can be split into artist and actual title:
+                                    try {
+                                        let info = mState.title.split(compositeTitle.separator);
+                                        mState.artist = info[compositeTitle.indexOfArtist].trim();
+                                        mState.title = info[compositeTitle.indexOfTitle].trim();
+                                        self.logger.info('[Bauerradio] Split composite title.');
+                                   }
+                                    catch (ex) {
+                                       self.logger.info('[Bauerradio] Current track does not have sufficient metadata: Missing artist. Failed to split composite title ' + mState.title);
+                                   }
+                                } else {
+                                    mState.albumart = self.currentStation.albumart;
+                                    mState.title = self.currentStation.name;
+                                }
+                            }
+                            defer.resolve(mState);
+                        }
                     }
                 })
 //                .fail(defer.resolve(self.state));
@@ -898,7 +921,9 @@ ControllerBauerRadio.prototype.getMetadata = function () {
 ControllerBauerRadio.prototype.setMetadata = function (playState) {
     let self = this;
     
-    return self.getMetadata()
+    if (playState == 'stop') {
+        return self.currentStation;
+    } else return self.getMetadata()
     .then(function(metadata) {
         self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
         if (metadata){
