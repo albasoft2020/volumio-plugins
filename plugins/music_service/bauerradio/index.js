@@ -36,7 +36,8 @@ function ControllerBauerRadio(context) {
     self.configManager = this.context.configManager;
     self.serviceName = 'bauerradio';
     
-    self.updateService = 'mpd';
+//    self.updateService = 'mpd';
+    self.updateService = 'bauerradio';
     self.currentStation;
     
     self.previousSong = '';
@@ -507,50 +508,13 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
 //    var brandID=curUri.split('/')[2];
     let stationID = curUri.split('/').pop();
 
-//    var cookieJar = unirest.jar()
-//    cookieJar.add('PHPSESSID=' + this.sessionId, 'https://users.hotelradio.fm/api/channels/group')
-//
-//    var request = unirest.post('https://users.hotelradio.fm/api/channels/group')
-//        .jar(cookieJar)
-//        .send('id=' + brandID)
-//        .then((response) => {
-//            if (response &&
-//                response.status === 200 &&
-//                'channels' in response.body) {
-//
-//
-//                var explodeResp = {
-//                    "uri": ""
-//                }
-//                response.body['channels'].map(channel => {
-//                    if(channel['id']==stationID)
-//                    {
-//                        if(channel["mp3128_stream_dir"] && channel['mp3128_stream_dir']!="")
-//                        {
-//                            explodeResp['uri']=channel['stream_path']+channel["mp3128_stream_dir"]
-//                        }
-//                        else if(channel['aacp_stream_dir'] && channel['aacp_stream_dir']!="")
-//                        {
-//                            explodeResp['uri']=channel['stream_path']+channel["aacp_stream_dir"]
-//                        } 
-//                        else {
-//                            explodeResp['uri']=channel['stream_path']+channel["stream_dir"]
-//                        }
-//                        
-//                    }
-//                })
-//
-//                defer.resolve(explodeResp)
-//            } else {
-//                defer.reject()
-//            }
-//        })
     let explodeResp = {
         "uri": ""
     };
     bRadio.getStationDetails(stationID)
         .then((response) => {
-            explodeResp["name"] = response["name"];
+//            explodeResp["name"] = response["name"];
+            explodeResp["title"] = response["name"];
             explodeResp["albumart"] = response["albumart"];
             explodeResp["uri"] = bRadio.getStreamUrl(stationID);
             self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
@@ -580,8 +544,9 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                 })
                 .then(function() {
                     // try with 'consumeIgnoreMetadata' set to true
-                    self.commandRouter.stateMachine.setConsumeUpdateService(self.updateService, true);
-//                    self.commandRouter.stateMachine.setConsumeUpdateService(this.serviceName);
+//                    self.commandRouter.stateMachine.setConsumeUpdateService(self.updateService, true);
+                    // Maybe stop pretending to be 'mpd' and just admit who is in control...
+                    self.commandRouter.stateMachine.setConsumeUpdateService(self.serviceName);
                     self.currentStation = track;
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
@@ -603,11 +568,15 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 ControllerBauerRadio.prototype.stop = function() {
     var self = this;
     self.logger.info('[BauerRadio] Stopped playback');
-    if (self.timer) {
-        self.logger.info('[BauerRadio] Stopping timer');
-        self.timer.clear();
-    }
-    return self.mpdPlugin.sendMpdCommand('stop', []).then(self.setMetadata('stop'));
+
+    return self.setMetadata('stop').then(() => self.mpdPlugin.sendMpdCommand('stop', []));
+};
+
+ControllerBauerRadio.prototype.pause = function() {
+    var self = this;
+    self.logger.info('[BauerRadio] Can\'t pause, so stopping playback');
+
+    return (self.setMetadata('stop').then(()=> self.commandRouter.stateMachine.stop()));
 };
 
 ControllerBauerRadio.prototype.getUIConfig = function () {
@@ -816,28 +785,29 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
         albumart: metadata.albumart,
 //        uri: flacUri,
 //        name: metadata.title,
-        title: metadata.title,
+        title: metadata.title || '',  // make sure title is always a string
         artist: metadata.artist,
         album: metadata.album,
         streaming: true,
 //        disableUiControls: true,
         duration: metadata.duration,
-        seek: seek,
-//        samplerate: '44.1 KHz',
-//        bitdepth: '16 bit',
-        channels: 2
+        seek: seek
     };
-
+    
+    if (metadata.samplerate) prState.samplerate = metadata.samplerate  + ' kHz';
+    if (metadata.bitdepth) prState.bitdepth = metadata.bitdepth;
+    if (metadata.channels) prState.channels = metadata.channels;
+    
     self.state = prState;
 
     //workaround to allow state to be pushed when not in a volatile state
     var vState = self.commandRouter.stateMachine.getState();
     var queueItem = self.commandRouter.stateMachine.playQueue.arrayQueue[vState.position];
 
-    queueItem.name =  metadata.title;
+    queueItem.name =  metadata.title || '';
     queueItem.artist =  metadata.artist;
 //    queueItem.album = metadata.album;
-    queueItem.albumart = metadata.albumart;
+    queueItem.albumart = metadata.albumart; 
 //    queueItem.trackType = 'Rparadise '+ channelMix;
     queueItem.duration = metadata.duration;
 //    queueItem.samplerate = '44.1 KHz';
@@ -866,6 +836,10 @@ ControllerBauerRadio.prototype.getMetadata = function () {
         if (bRadio.realTimeNowPlaying()){
             bRadio.nowPlaying()
                 .then(song => {
+                    if (!song.title) {
+                        self.logger.info('[BauerRadio] Empty realtime now playing response. Somthing is going wrong here');
+                        song = self.currentStation;
+                    }
                     if ((song.title == self.state.title) && (song.artist == self.state.artist)) {
                         defer.resolve({unchanged: true});
                     } else {
@@ -874,6 +848,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                 });
         } else {
             self.mpdPlugin.getState()
+//            self.commandRouter.stateMachine.getState()
                 .then(mState => {
                     if (self.currentSong == mState.title) {
                             defer.resolve({unchanged: true});
@@ -884,6 +859,9 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                                 bRadio.getEventDetails(mState.title)
                                     .then(song => {
                                         self.currentSong = mState.title;
+                                        song.samplerate = mState.samplerate;
+                                        song.bitdepth = mState.bitdepth;
+                                        song.channels = mState.channels,
                                         self.logger.info('[BauerRadio] metadata: ' + JSON.stringify(song));
                                         self.logger.info('[BauerRadio] Pass on metadata');
                                         defer.resolve(song);
@@ -922,7 +900,11 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
     let self = this;
     
     if (playState == 'stop') {
-        return self.currentStation;
+        if (self.timer) {
+            self.logger.info('[BauerRadio] Stopping timer');
+            self.timer.clear();
+        }
+        return libQ.resolve(self.pushSongState(self.currentStation, playState));
     } else return self.getMetadata()
     .then(function(metadata) {
         self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));

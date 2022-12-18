@@ -204,12 +204,18 @@ module.exports = {
                 streamURL = stationDetails['streamACC']
             else if (stationDetails['streamMP3'])
                 streamURL = stationDetails['streamMP3']
-            if (streamURL != ""){
-                // If it is not a premium link we need to add 2 required parameters:
-                // aw_0_1st.playerid=BMUK_html5
-                // aw_0_1st.skey: time stamp
-                streamURL += "&aw_0_1st.playerid=BMUK_html5&aw_0_1st.skey=" + Math.round(Date.now()/1e3);
-            }
+//            if (streamURL != ""){
+//                // If it is not a premium link we need to add 2 required parameters:
+//                // aw_0_1st.playerid=BMUK_html5
+//                // aw_0_1st.skey: time stamp
+//                streamURL += "&aw_0_1st.playerid=BMUK_html5&aw_0_1st.skey=" + Math.round(Date.now()/1e3);
+//            }
+        }
+        if (streamURL != ""){
+            // Seems like we need to add 2 required parameters:
+            // aw_0_1st.playerid=BMUK_html5
+            // aw_0_1st.skey: time stamp
+            streamURL += "&aw_0_1st.playerid=BMUK_html5&aw_0_1st.skey=" + Math.round(Date.now()/1e3);
         }
         this.setNowPlayingURL(streamURL, stationKey);
         return streamURL;
@@ -226,7 +232,7 @@ module.exports = {
             
             NowPlayingPremiumUrl.search = searchParams.toString();
             realTimeNowPlaying = NowPlayingPremiumUrl.href;
-            currentNowPlaying = NowPlayingPremiumUrl.href;
+            currentNowPlaying = NowPlayingUrl +'/' + stationKey;
         } else {
             realTimeNowPlaying = '';
             currentNowPlaying = NowPlayingUrl +'/' + stationKey;
@@ -271,18 +277,29 @@ module.exports = {
         if (realTimeNowPlaying) {
             this.getNowPlayingDetails(realTimeNowPlaying)
                 .then(song => {
-                    this.getEventDetails(song.url)
-                        .then(song => {
-//                            console.log(JSON.stringify(song)); 
-                            defer.resolve(song);
-                        });
+//                    console.log(JSON.stringify(song)); 
+                    if (song.url){
+                        this.getEventDetails(song.url)
+                            .then(song => {
+    //                            console.log(JSON.stringify(song)); 
+                                defer.resolve(song);
+                            });
+                    } else {
+                        // Shouldn't really happen unless there is an issue with the service...
+                        console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
+                        this.getNowPlayingDetails(currentNowPlaying)
+                            .then(song => {
+//                                console.log(JSON.stringify(song)); 
+                                defer.resolve(song);
+                            });
+                    }
                 });
-        } else {
-            this.getNowPlayingDetails(currentNowPlaying)
+                this.getNowPlayingDetails(currentNowPlaying)
                 .then(song => {
 //                    console.log(JSON.stringify(song)); 
                     defer.resolve(song);
-                });
+                });    } else {
+
         }
         return defer.promise;
     },
