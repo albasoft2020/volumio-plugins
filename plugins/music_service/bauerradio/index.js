@@ -40,6 +40,8 @@ function ControllerBauerRadio(context) {
     self.updateService = 'bauerradio';
     self.currentStation;
     
+    self.debug = 0;
+    
     self.previousSong = '';
     self.currentSong = '';
     self.state = {artist: '', title: ''};
@@ -516,13 +518,22 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
 //            explodeResp["name"] = response["name"];
             explodeResp["title"] = response["name"];
             explodeResp["albumart"] = response["albumart"];
-            explodeResp["uri"] = bRadio.getStreamUrl(stationID);
-            self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
-            defer.resolve(explodeResp);
+            bRadio.selectStation(stationID)
+                    .then(station => {
+                        self.currentStation = station;
+                        explodeResp["uri"] = station.uri;
+                        self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
+                        defer.resolve(explodeResp);
+                    })
         });
     return defer.promise;
 };
 
+/**
+* Standard method called to start playback of a music service
+
+ * @param {type} track
+ * @returns {nm$_index.ControllerBauerRadio.prototype.clearAddPlayTrack.defer|Object.prototype.clearAddPlayTrack.defer} */
 ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
     var self = this;
     var defer=libQ.defer();
@@ -547,7 +558,7 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 //                    self.commandRouter.stateMachine.setConsumeUpdateService(self.updateService, true);
                     // Maybe stop pretending to be 'mpd' and just admit who is in control...
                     self.commandRouter.stateMachine.setConsumeUpdateService(self.serviceName);
-                    self.currentStation = track;
+//                    self.currentStation = track;
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
                 .then(() => setTimeout(self.setMetadata.bind(self), 1000, 'play'))
@@ -565,13 +576,20 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
     return defer;
 };
 
-ControllerBauerRadio.prototype.stop = function() {
+/**
+* Stop playback and set metadata back to station defaults
+* @returns {unresolved} */
+ ControllerBauerRadio.prototype.stop = function() {
     var self = this;
     self.logger.info('[BauerRadio] Stopped playback');
 
     return self.setMetadata('stop').then(() => self.mpdPlugin.sendMpdCommand('stop', []));
 };
 
+/**
+* Needed as volumio also seems to expect a pause method whenever duration of a stream is not 0
+* Use this to also stop the stream similar to the stop method.
+ * @returns {unresolved} */
 ControllerBauerRadio.prototype.pause = function() {
     var self = this;
     self.logger.info('[BauerRadio] Can\'t pause, so stopping playback');
@@ -780,7 +798,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
 //        service: self.serviceName,
         service: this.updateService,
 //        type: 'webradio',
-        trackType: 'aac',
+        trackType: self.currentStation.trackType,
 //        radioType: 'bauerradio',
         albumart: metadata.albumart,
 //        uri: flacUri,
@@ -808,7 +826,6 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     queueItem.artist =  metadata.artist;
 //    queueItem.album = metadata.album;
     queueItem.albumart = metadata.albumart; 
-//    queueItem.trackType = 'Rparadise '+ channelMix;
     queueItem.duration = metadata.duration;
 //    queueItem.samplerate = '44.1 KHz';
 //    queueItem.bitdepth = '16 bit';
@@ -831,13 +848,13 @@ ControllerBauerRadio.prototype.getMetadata = function () {
     var self = this;
     var defer = libQ.defer();    
     
-    self.logger.info('[BauerRadio] getMetadata started');
+    if (self.debug > 1) self.logger.info('[BauerRadio] getMetadata started');
 
         if (bRadio.realTimeNowPlaying()){
             bRadio.nowPlaying()
                 .then(song => {
                     if (!song.title) {
-                        self.logger.info('[BauerRadio] Empty realtime now playing response. Somthing is going wrong here');
+                        self.logger.info('[BauerRadio] Empty realtime now playing response. Something is going wrong here');
                         song = self.currentStation;
                     }
                     if ((song.title == self.state.title) && (song.artist == self.state.artist)) {
@@ -910,22 +927,23 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
         self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
         if (metadata){
             if(metadata.unchanged) {
-                self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                if (self.debug > 1) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
                 if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
-                return;
+                return libQ.resolve();
             }
             else {
                 return libQ.resolve(self.pushSongState(metadata, playState))
                 .then(function () {
-                    self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                    if (self.debug > 1) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
                     if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
                 });
             }
         };
     })
     .fail(() => {
-        self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+        if (self.debug > 0) self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
         if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
+        return libQ.resolve();
     });
 };
 

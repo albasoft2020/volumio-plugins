@@ -17,6 +17,17 @@ let currentPlayingURL = '';
 let realTimeNowPlaying = '';
 let currentNowPlaying = '';
 
+const currentStation = {
+    "name": '',
+    "premium" : '',
+    "nowPlaying":'',
+    "realtimeNP":'',
+    "albumart":'',
+    "uri": '',
+    "trackType":''
+};
+    
+
 //premiumUser = false;
 // ======================= START OF MODULE EXPORT
 module.exports = {
@@ -74,6 +85,27 @@ module.exports = {
                 });
         }
         return defer.promise;
+    },
+    
+    selectStation: function (stationKey) {
+        
+//        console.log('Station key again: ',stationKey, ' in map? ', stations.has(stationKey));
+        let stationDetails = stations.get(stationKey);  
+        let stream = this.getStreamUrl(stationDetails);
+
+        this.setNowPlayingURL(stream.url, stationKey);
+
+        currentStation.name = stationDetails.name;
+        currentStation.premium = stream.premium;
+        currentStation.albumart = stationDetails.albumart;
+        currentStation.uri = stream.url;
+        currentStation.trackType =stream.type;
+        
+        return libQ.resolve(currentStation);
+    },
+    
+    getActiveStationDetails: function () {
+        return currentStation;
     },
 
     // Get a details for selected station
@@ -186,24 +218,26 @@ module.exports = {
     },
     
     // Get a details for selected station
-    getStreamUrl: function (stationKey) {
+    getStreamUrl: function (stationDetails) {
         
     //    var defer=libQ.defer();
-        let stationDetails = stations.get(stationKey);       
+//        let stationDetails = stations.get(stationKey);       
         let streamURL = "";
+        let type = "";
+        let premium = false;
 
         if (premiumUser) {
             if (preferACC && stationDetails['streamPremiumACC'])
-                streamURL = stationDetails['streamPremiumACC']
+                { streamURL = stationDetails['streamPremiumACC']; type ='aac'; premium = true; }
             else if (stationDetails['streamPremiumMP3'])
-                streamURL = stationDetails['streamPremiumMP3']
+                { streamURL = stationDetails['streamPremiumMP3']; type ='mp3'; premium = true; }
             if (uid) streamURL += "&listenerid=" + uid;
         }
         if (streamURL == "")  {// not premiumUser or failed find premium stream
             if (preferACC && stationDetails['streamACC'])
-                streamURL = stationDetails['streamACC']
+                { streamURL = stationDetails['streamACC']; type ='aac'; }
             else if (stationDetails['streamMP3'])
-                streamURL = stationDetails['streamMP3']
+                { streamURL = stationDetails['streamMP3']; type ='mp3'; }
 //            if (streamURL != ""){
 //                // If it is not a premium link we need to add 2 required parameters:
 //                // aw_0_1st.playerid=BMUK_html5
@@ -217,8 +251,7 @@ module.exports = {
             // aw_0_1st.skey: time stamp
             streamURL += "&aw_0_1st.playerid=BMUK_html5&aw_0_1st.skey=" + Math.round(Date.now()/1e3);
         }
-        this.setNowPlayingURL(streamURL, stationKey);
-        return streamURL;
+        return {url: streamURL, type: type, premium: premium};
     },
     
     setNowPlayingURL: function(streamUrl, stationKey) {
@@ -246,7 +279,11 @@ module.exports = {
 
         var defer=libQ.defer();
 
-        unirest
+        if (eventUrl.split('/').slice(-1) < 0) {  // If event URL ends in a negative number (or always -1?) its a station jimgle...
+            defer.resolve();
+        }
+        else {
+            unirest
             .get(eventUrl)
             .then((response) => {
                 if (response && response.status === 200) {
@@ -267,6 +304,7 @@ module.exports = {
                     defer.reject(new Error('Failed to retrieve event data from URL: ' + eventUrl));
                 }
             });
+        }
 
         return defer.promise;
     },
