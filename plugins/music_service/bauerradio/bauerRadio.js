@@ -276,30 +276,30 @@ module.exports = {
         
         if (realTimeNowPlaying) {
             this.getNowPlayingDetails(realTimeNowPlaying)
-                .then(song => {
+            .then(song => {
 //                    console.log(JSON.stringify(song)); 
-                    if (song.url){
-                        this.getEventDetails(song.url)
-                            .then(song => {
-    //                            console.log(JSON.stringify(song)); 
-                                defer.resolve(song);
-                            });
-                    } else {
-                        // Shouldn't really happen unless there is an issue with the service...
-                        console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
-                        this.getNowPlayingDetails(currentNowPlaying)
-                            .then(song => {
+                if (song.url){
+                    this.getEventDetails(song.url)
+                        .then(song => {
+//                            console.log(JSON.stringify(song)); 
+                            defer.resolve(song);
+                        });
+                } else {
+                    // Shouldn't really happen unless there is an issue with the service...
+                    console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
+                    this.getNowPlayingDetails(currentNowPlaying)
+                        .then(song => {
 //                                console.log(JSON.stringify(song)); 
-                                defer.resolve(song);
-                            });
-                    }
-                });
-                this.getNowPlayingDetails(currentNowPlaying)
-                .then(song => {
+                            defer.resolve(song);
+                        });
+                }
+            });
+        } else {
+            this.getNowPlayingDetails(currentNowPlaying)
+            .then(song => {
 //                    console.log(JSON.stringify(song)); 
-                    defer.resolve(song);
-                });    } else {
-
+                defer.resolve(song);
+            });    
         }
         return defer.promise;
     },
