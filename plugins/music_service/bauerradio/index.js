@@ -40,7 +40,7 @@ function ControllerBauerRadio(context) {
     self.updateService = 'bauerradio';
     self.currentStation;
     
-    self.debug = 0;
+    self.debug = 2;
     
     self.previousSong = '';
     self.currentSong = '';
@@ -559,13 +559,14 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                     // Maybe stop pretending to be 'mpd' and just admit who is in control...
                     self.commandRouter.stateMachine.setConsumeUpdateService(self.serviceName);
 //                    self.currentStation = track;
+                    setTimeout(self.setMetadata.bind(self), 2000, 'play')
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
-                .then(() => setTimeout(self.setMetadata.bind(self), 1000, 'play'))
-                .fail(function (e) {
-                    self.logger.error('Could not Clear and Play BauerRadio Track: ' + e);
-                    defer.reject(new Error());
-                })
+//                .then(() => setTimeout(self.setMetadata.bind(self), 1000, 'play'))
+//                .fail(function (e) {
+//                    self.logger.error('Could not Clear and Play BauerRadio Track: ' + e);
+//                    defer.reject(new Error());
+//                })
             ;
         })
         .fail(function(e)
@@ -788,10 +789,10 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     let seek = 0;
     let ts = Date.now();
     
-    if (metadata.timestamp){
-        seek = (ts - metadata.timestamp * 1000);
-        ts = metadata.timestamp * 1000;
-    }
+//    if (metadata.timestamp){
+//        seek = (ts - metadata.timestamp * 1000);
+//        ts = metadata.timestamp * 1000;
+//    }
     
     var prState = {
         status: status,
@@ -811,12 +812,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
         duration: metadata.duration,
         seek: seek
     };
-    
-    if (metadata.samplerate) prState.samplerate = metadata.samplerate  + ' kHz';
-    if (metadata.bitdepth) prState.bitdepth = metadata.bitdepth;
-    if (metadata.channels) prState.channels = metadata.channels;
-    
-    self.state = prState;
+
 
     //workaround to allow state to be pushed when not in a volatile state
     var vState = self.commandRouter.stateMachine.getState();
@@ -827,9 +823,12 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
 //    queueItem.album = metadata.album;
     queueItem.albumart = metadata.albumart; 
     queueItem.duration = metadata.duration;
-//    queueItem.samplerate = '44.1 KHz';
-//    queueItem.bitdepth = '16 bit';
-//    queueItem.channels = 2;
+      
+    if (metadata.samplerate) { prState.samplerate = metadata.samplerate  + ' kHz'; queueItem.samplerate = prState.samplerate; }
+    if (metadata.bitdepth) { prState.bitdepth = metadata.bitdepth; queueItem.bitdepth = metadata.bitdepth; }
+    if (metadata.channels) { prState.channels = metadata.channels; queueItem.channels = metadata.channels; }
+    
+    self.state = prState;
     
     //reset volumio internal timer
     self.commandRouter.stateMachine.currentSeek = seek;
@@ -860,7 +859,16 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                     if ((song.title == self.state.title) && (song.artist == self.state.artist)) {
                         defer.resolve({unchanged: true});
                     } else {
-                        defer.resolve(song);
+                        // get extra data directly from mpd
+                        self.mpdPlugin.getState()
+                            .then(mState => {
+                                song.samplerate = mState.samplerate;
+                                song.bitdepth = mState.bitdepth;
+                                song.channels = mState.channels;
+                                song.bitrate = mState.bitrate;
+                                defer.resolve(song);
+                            })
+                            .fail(() => defer.resolve(song));
                     }
                 });
         } else {

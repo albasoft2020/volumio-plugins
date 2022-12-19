@@ -13,12 +13,11 @@ let lastBrandsUpdate = -1;
 let premiumUser = true;
 let preferACC = true;
 let uid = '';
-let currentPlayingURL = '';
 let realTimeNowPlaying = '';
 let currentNowPlaying = '';
 
 const currentStation = {
-    "name": '',
+    "title": '',
     "premium" : '',
     "nowPlaying":'',
     "realtimeNP":'',
@@ -95,7 +94,7 @@ module.exports = {
 
         this.setNowPlayingURL(stream.url, stationKey);
 
-        currentStation.name = stationDetails.name;
+        currentStation.title = stationDetails.name;
         currentStation.premium = stream.premium;
         currentStation.albumart = stationDetails.albumart;
         currentStation.uri = stream.url;
@@ -256,7 +255,6 @@ module.exports = {
     
     setNowPlayingURL: function(streamUrl, stationKey) {
         
-        currentPlayingURL = streamUrl; 
         if (streamUrl.startsWith(premiumStreamBase) && uid) {
             const url = new URL(streamUrl);
             console.log('Stream ID: ', url.pathname.slice(1) , ' , Search: ' , url.search);
@@ -296,6 +294,8 @@ module.exports = {
                             'albumart' : eventDetails.eventImageUrl,
                             'timestamp' : Math.floor(new Date(eventDetails.eventStart).getTime() / 1000)
                         };
+                        if (eventDetails.eventImageUrl === 'https://media.bauerradio.com/image/upload/tracks/0.jpg') 
+                            song.albumart = currentStation.albumart;
                         defer.resolve(song);
                     } else {
                         defer.resolve(eventDetails);
