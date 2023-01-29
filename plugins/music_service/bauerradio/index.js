@@ -547,26 +547,29 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                 .then(function() {
                     return self.mpdPlugin.sendMpdCommand('clear',[]);
                 })
-                .then(function(stream) {
-                    return self.mpdPlugin.sendMpdCommand('load "'+track.uri+'"',[]);
-                })
-                .fail(function (e) {
+                .then(function() {
+//                    return self.mpdPlugin.sendMpdCommand('load "'+track.uri+'"',[]);
+//                })
+//                .fail(function (e) {
                     return self.mpdPlugin.sendMpdCommand('add "'+track.uri+'"',[]);
                 })
                 .then(function() {
                     // try with 'consumeIgnoreMetadata' set to true
-//                    self.commandRouter.stateMachine.setConsumeUpdateService(self.updateService, true);
-                    // Maybe stop pretending to be 'mpd' and just admit who is in control...
-                    self.commandRouter.stateMachine.setConsumeUpdateService(self.serviceName);
+//                    self.commandRouter.stateMachine.setConsumeUpdateService('mpd', true);
 //                    self.currentStation = track;
-                    setTimeout(self.setMetadata.bind(self), 2000, 'play')
+//                    setTimeout(self.setMetadata.bind(self), 2000, 'play')
                     return self.mpdPlugin.sendMpdCommand('play',[]);
                 })
-//                .then(() => setTimeout(self.setMetadata.bind(self), 1000, 'play'))
-//                .fail(function (e) {
-//                    self.logger.error('Could not Clear and Play BauerRadio Track: ' + e);
-//                    defer.reject(new Error());
-//                })
+                .then(() => { 
+                    // Maybe stop pretending to be 'mpd' and just admit who is in control...
+                    self.commandRouter.stateMachine.setConsumeUpdateService(self.serviceName);
+                    setTimeout(self.setMetadata.bind(self), 2000, 'start'); 
+                    defer.resolve();
+                }) 
+                .fail(function (e) {
+                    self.logger.error('Could not Clear and Play BauerRadio Track: ' + e);
+                    defer.reject(new Error());
+                })
             ;
         })
         .fail(function(e)
@@ -813,7 +816,8 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
         seek: seek
     };
 
-
+    if (status === 'start') prState.status = 'play';
+            
     //workaround to allow state to be pushed when not in a volatile state
     var vState = self.commandRouter.stateMachine.getState();
     var queueItem = self.commandRouter.stateMachine.playQueue.arrayQueue[vState.position];
@@ -827,7 +831,9 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     if (metadata.samplerate) { prState.samplerate = metadata.samplerate  + ' kHz'; queueItem.samplerate = prState.samplerate; }
     if (metadata.bitdepth) { prState.bitdepth = metadata.bitdepth; queueItem.bitdepth = metadata.bitdepth; }
     if (metadata.channels) { prState.channels = metadata.channels; queueItem.channels = metadata.channels; }
-    
+
+    self.logger.info('[BauerRadio] Current state: ' + vState.status + ', Queue position: ' + vState.position);
+
     self.state = prState;
     
     //reset volumio internal timer
@@ -841,6 +847,10 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     //volumio push state
 //    self.commandRouter.servicePushState(prState, self.serviceName);
     self.commandRouter.servicePushState(prState, this.updateService);
+    
+    // Hack: for the first track Volumio does not seem to take this status (info: CoreStateMachine::syncState   stateService play, but currentStatus stop)
+    // so resend data a second time, which seems to do the trick...
+    if (status === 'start') self.commandRouter.servicePushState(prState, this.updateService);
 };
 
 ControllerBauerRadio.prototype.getMetadata = function () {
@@ -936,21 +946,21 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
         if (metadata){
             if(metadata.unchanged) {
                 if (self.debug > 1) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-                if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
+                if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 return libQ.resolve();
             }
             else {
                 return libQ.resolve(self.pushSongState(metadata, playState))
                 .then(function () {
                     if (self.debug > 1) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-                    if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
+                    if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 });
             }
         };
     })
     .fail(() => {
         if (self.debug > 0) self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-        if (playState == 'play') self.timer = new PRTimer(self.setMetadata.bind(self), [playState], nowPlayingRefresh);
+        if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
         return libQ.resolve();
     });
 };
