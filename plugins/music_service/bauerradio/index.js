@@ -548,9 +548,6 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                     return self.mpdPlugin.sendMpdCommand('clear',[]);
                 })
                 .then(function() {
-//                    return self.mpdPlugin.sendMpdCommand('load "'+track.uri+'"',[]);
-//                })
-//                .fail(function (e) {
                     return self.mpdPlugin.sendMpdCommand('add "'+track.uri+'"',[]);
                 })
                 .then(function() {
@@ -857,7 +854,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
     var self = this;
     var defer = libQ.defer();    
     
-    if (self.debug > 1) self.logger.info('[BauerRadio] getMetadata started');
+    if (self.debug > 2) self.logger.info('[BauerRadio] getMetadata started');
 
         if (bRadio.realTimeNowPlaying()){
             bRadio.nowPlaying()
@@ -945,14 +942,14 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
         self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
         if (metadata){
             if(metadata.unchanged) {
-                if (self.debug > 1) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                if (self.debug > 2) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
                 if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 return libQ.resolve();
             }
             else {
                 return libQ.resolve(self.pushSongState(metadata, playState))
                 .then(function () {
-                    if (self.debug > 1) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                    if (self.debug > 2) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
                     if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 });
             }

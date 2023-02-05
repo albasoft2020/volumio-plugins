@@ -1,5 +1,6 @@
 'use strict';
 var unirest=require('unirest');
+var cookie = require('cookie');
 var libQ=require('kew');
 
 const premiumStreamBase = 'https://stream.on.revma.com';
@@ -400,26 +401,50 @@ module.exports = {
         const targetrefresh = 'https://account.planetradio.co.uk//user/api/me/';
                         
         unirest
-            .head(target1)
-            .header('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
-         //   .header('Cache-Control', 'no-cache')
-         //        .header('referer', 'https://planetradio.co.uk/')
+            .get(targetstep1)
+            .header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
+//          // 'User-Agent' seems to be required! Took me ages to figure out...
+//          This is the firefox string:
+//            .header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0')
+//          But maybe using a curl string is a bit closer to reality
+            .header('User-Agent', 'curl/7.64.1')
+//          All these do not seem to be required after all:
+//            .header('Accept-Language', 'en-GB,en;q=0.5')
+//            .header('Accept-Encoding', 'gzip, deflate, br')
+//            .header('Sec-Fetch-Dest', 'document')
+//            .header('Sec-Fetch-Mode', 'navigate')
+//            .header('Sec-Fetch-Site', 'none')
+//            .header('Sec-Fetch-User', '?1')
+//            .header('Cache-Control', 'no-cache')
+//            .header('referer', 'https://planetradio.co.uk/')
             .then((response) => {
-                console.log(JSON.stringify(response));
-                if (response && response.status === 200 && response.cookies && 'PHPSESSID' in response.cookies) {
-                    // not updated yet, as not really working so far...
+                console.log('Response headers: ' ,JSON.stringify(response.headers));
+                if (response && response.status === 200 && response.cookies && 'XSRF-TOKEN' in response.cookies) {
+//                    // the following does NOT work, as it only sees the empty XSRF-TOKEN:
+//                    console.log('Cookies: ',JSON.stringify(response.cookies));
+                    console.log('Set-Cookie array: ',JSON.stringify(response.headers['set-cookie']));
                     let cookieJar=unirest.jar();
-                    let cookie = 'PHPSESSID='+response.cookies['PHPSESSID'];
-                    console.log(cookie);
-                    
-                    cookieJar.add('PHPSESSID='+response.cookies['PHPSESSID'],'account.planetradio.co.uk/');
-                    console.log(JSON.stringify(cookieJar));
-                    let request=unirest.get(targetstep1)
-                        .header('accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
-                        .header('Cache-Control', 'no-cache')
-                        .jar(response.cookies)
+                    let XSRFtoken = cookie.parse(response.headers['set-cookie'][0]);
+                    console.log('XSRF-TOKEN cookie: ', XSRFtoken);
+                    //cookieJar.add(response.headers['set-cookie'][0]);
+
+//                    console.log('Cookie jar: ',JSON.stringify(cookieJar));
+                    let request=unirest.post(targetstep2)
+                        .header('Accept', 'application/json, text/plain, */*')
+                        .header('Referer', targetstep1)
+                        .header('Origin', 'https://account.planetradio.co.uk')
+                        .header('Accept-Language', 'en-GB,en;q=0.9')
+                        .header('Cache-Control', 'max-age=0')
+                        .header('x-xsrf-token', XSRFtoken['XSRF-TOKEN'])	// Special for PlanetRadio
+                        .header('content-type', 'application/json;charset=UTF-8') // Special for PlanetRadio
+                        .header('cookie', response.headers['set-cookie'])
+//                        .jar(response.cookies)
+                        .send({
+                            "email": username,
+                            "password": password
+                        })
                         .then((response) => {
-                            console.log(JSON.stringify(response));
+                            console.log('Step2 response: ', JSON.stringify(response));
                         })
 
                     let eventDetails = response.body;
