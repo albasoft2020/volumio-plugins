@@ -16,6 +16,7 @@ let preferACC = true;
 let uid = '';
 let realTimeNowPlaying = '';
 let currentNowPlaying = '';
+let bauerCookies = [];
 
 const currentStation = {
     "title": '',
@@ -388,7 +389,7 @@ module.exports = {
         return premiumUser = premium;
     },
     
- loginToBauerRadio: function(username, password) {
+    loginToBauerRadio: function(username, password) {
 
         var defer=libQ.defer();
         
@@ -401,7 +402,8 @@ module.exports = {
         const targetrefresh = 'https://account.planetradio.co.uk//user/api/me/';
                         
         unirest
-            .get(targetstep1)
+            // We don't need to get the body; all the info we need is in the return header...
+            .head(targetstep1)
             .header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
 //          // 'User-Agent' seems to be required! Took me ages to figure out...
 //          This is the firefox string:
@@ -416,28 +418,29 @@ module.exports = {
 //            .header('Sec-Fetch-Site', 'none')
 //            .header('Sec-Fetch-User', '?1')
 //            .header('Cache-Control', 'no-cache')
-//            .header('referer', 'https://planetradio.co.uk/')
             .then((response) => {
                 console.log('Response headers: ' ,JSON.stringify(response.headers));
                 if (response && response.status === 200 && response.cookies && 'XSRF-TOKEN' in response.cookies) {
 //                    // the following does NOT work, as it only sees the empty XSRF-TOKEN:
 //                    console.log('Cookies: ',JSON.stringify(response.cookies));
-                    console.log('Set-Cookie array: ',JSON.stringify(response.headers['set-cookie']));
-                    let cookieJar=unirest.jar();
+                    bauerCookies = response.headers['set-cookie'];
+                    console.log('Set-Cookie array: ',JSON.stringify(bauerCookies));
+//                    let cookieJar=unirest.jar();
+                    // Dirty hack: assumes the relevant cookie is always the first one...
                     let XSRFtoken = cookie.parse(response.headers['set-cookie'][0]);
                     console.log('XSRF-TOKEN cookie: ', XSRFtoken);
                     //cookieJar.add(response.headers['set-cookie'][0]);
 
 //                    console.log('Cookie jar: ',JSON.stringify(cookieJar));
-                    let request=unirest.post(targetstep2)
+                    unirest.post(targetstep2)
                         .header('Accept', 'application/json, text/plain, */*')
                         .header('Referer', targetstep1)
-                        .header('Origin', 'https://account.planetradio.co.uk')
+                        .header('Origin', target1)
                         .header('Accept-Language', 'en-GB,en;q=0.9')
                         .header('Cache-Control', 'max-age=0')
                         .header('x-xsrf-token', XSRFtoken['XSRF-TOKEN'])	// Special for PlanetRadio
                         .header('content-type', 'application/json;charset=UTF-8') // Special for PlanetRadio
-                        .header('cookie', response.headers['set-cookie'])
+                        .header('cookie', bauerCookies)
 //                        .jar(response.cookies)
                         .send({
                             "email": username,
@@ -445,10 +448,18 @@ module.exports = {
                         })
                         .then((response) => {
                             console.log('Step2 response: ', JSON.stringify(response));
-                        })
+                            // Should do some error checking here
+                            if (response.headers['set-cookie']) bauerCookies = bauerCookies.concat(response.headers['set-cookie']);
+                            console.log('All Cookies: ',JSON.stringify(bauerCookies));
+                            if ((response.body) && (response.body.miscellaneous)){
+                                premiumUser = ['active','trial'].includes(response.body.miscellaneous.premiumState);
+                                console.log('PremiumState: ', response.body.miscellaneous.premiumState);
+                            } else premiumUser = false;
+                            console.log('Premium user? ', premiumUser);
+                        });
 
-                    let eventDetails = response.body;
-                    defer.resolve(eventDetails);
+                    let userDetails = response.body;
+                    defer.resolve(userDetails);
                 } else {
                     defer.reject(new Error('Failed to retrieve event data from URL: ' ));
                 }
@@ -482,7 +493,34 @@ module.exports = {
 //
 //        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
 //            .jar(cookieJar)
+        return defer.promise;
+    },
 
+    getListernerID: function() {
+
+        var defer=libQ.defer();
+        
+        const target1 = 'https://account.planetradio.co.uk';
+        const target2 = 'https://synchrobox.adswizz.com/register2.php?aw_0_req.gdpr=true';
+                        
+        unirest
+            // We don't need to get the body; all the info we need is in the return header...
+            .head(target2)
+            .header('Accept', '*/*')
+//          // 'User-Agent' , but passing this in header seems to affect which ID gets returned...
+            .header('User-Agent', 'curl/7.64.1')
+            .header('Referer', target1)
+            .then((response) => {
+//                console.log('Response headers: ' ,JSON.stringify(response));
+                if (response && response.status === 200 && 'OAID' in response.cookies) {
+//                    let listenerID = response.cookies['OAID']; //cookie.parse(response.headers['set-cookie'][0]);
+//                    console.log('ListernerID cookie: ', listenerID, 'Unirest cookies: ', response.cookies);
+                    defer.resolve({uid: response.cookies['OAID'], expires: Date.parse(response.cookies.Expires)/1000 });
+                } else {
+                    if (response.body.error)
+                        defer.reject(new Error('Failed to retrieve listener ID: ', response.body.error ));
+                }
+            });
     return defer.promise;
 }
 };
