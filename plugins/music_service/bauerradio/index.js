@@ -118,8 +118,26 @@ ControllerBauerRadio.prototype.getI18n = function (key) {
 };
 
 ControllerBauerRadio.prototype.startupLogin = function () {
-    var self=this;
+    let self=this;
 
+    let listenerID = { uid : '', expires : 0};
+    let id = self.config.get("listenerID");
+    
+    if (id) { listenerID.uid = id; self.config.get("listenerIDexpiry") };
+    self.logger.info('[BauerRadio] Starting up. Saved listenerID: ', listenerID);
+    
+    bRadio.setUserID(listenerID)
+            .then(newID => {
+                if (newID.uid && (listenerID.uid != newID.uid)) {
+                    self.config.set("listenerID", newID.uid);
+                    self.logger.info('[BauerRadio] Updated listenerID: ' + newID.uid);
+                }
+                if (newID.expires && (listenerID.expires != newID.expires)) {
+                    self.config.set("listenerIDexpiry", newID.expires)
+                    self.logger.info('[BauerRadio] Updated listenerID: ' + newID.expires);
+                 }
+            });
+                
 //    self.shallLogin()
 //        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password'), false))
 //        .then(()=>self.registerIPAddress())
@@ -127,8 +145,18 @@ ControllerBauerRadio.prototype.startupLogin = function () {
     // HACK
     bRadio.setPremium(this.config.get("password"));
     // HACK
-    bRadio.setUserID(this.config.get("username"));
+//    bRadio.setUserID(this.config.get("username"));
     self.addToBrowseSources();
+};
+
+ControllerBauerRadio.prototype.checkListenerID = function () {
+    let self=this;
+    let defer=libQ.defer();
+
+    let listenerID = { uid : self.config.get("listernerID"), expires : self.config.get("listenerIDexpiry")};
+    if (listenerID.expires <= Math.floor(Date.now() / 1000))
+        return bRadio.getListernerID();
+    else return defer.resolve(listenerID);
 };
 
 ControllerBauerRadio.prototype.shallLogin = function () {

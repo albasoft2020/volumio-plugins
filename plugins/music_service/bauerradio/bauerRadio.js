@@ -382,7 +382,13 @@ module.exports = {
     },
     
     setUserID: function(id) {
-        return uid = id;
+        let defer=libQ.defer();
+        
+        if (id.expires <= Math.floor(Date.now() / 1000))
+            this.getListenerID().then(newID => {uid = newID.uid; defer.resolve(newID);});
+        else {uid = id.uid; defer.resolve(id);}
+        
+        return defer.promise;
     },
     
     setPremium: function(premium) {
@@ -496,7 +502,7 @@ module.exports = {
         return defer.promise;
     },
 
-    getListernerID: function() {
+    getListenerID: function() {
 
         var defer=libQ.defer();
         

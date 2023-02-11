@@ -2,9 +2,17 @@
     "username":{
         "type": "string",
         "value": ""
-      },
-      "password":{
-        "type": "string",
-        "value": ""
-      }
+	},
+	"password":{
+		"type": "password",
+		"value": ""
+	},
+	"listenerID":{
+		"type": "string",
+		"value": ""
+	},
+	"listenerIDexpiry":{
+		"type": "int",
+		"value": 0
+	}
 }
