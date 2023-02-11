@@ -40,7 +40,9 @@ function ControllerBauerRadio(context) {
     self.updateService = 'bauerradio';
     self.currentStation;
     
-    self.debug = 2;
+    self.debug = 5;
+    
+    self.isLoggedIn = false;
     
     self.previousSong = '';
     self.currentSong = '';
@@ -123,55 +125,47 @@ ControllerBauerRadio.prototype.startupLogin = function () {
     let listenerID = { uid : '', expires : 0};
     let id = self.config.get("listenerID");
     
-    if (id) { listenerID.uid = id; self.config.get("listenerIDexpiry") };
-    self.logger.info('[BauerRadio] Starting up. Saved listenerID: ', listenerID);
+    if (id) { listenerID.uid = id; listenerID.expires = self.config.get("listenerIDexpiry") };
+    if (self.debug) self.logger.info('[BauerRadio] Starting up. Saved listenerID: ', listenerID);
     
     bRadio.setUserID(listenerID)
             .then(newID => {
                 if (newID.uid && (listenerID.uid != newID.uid)) {
                     self.config.set("listenerID", newID.uid);
-                    self.logger.info('[BauerRadio] Updated listenerID: ' + newID.uid);
+                    if (self.debug > 2) self.logger.info('[BauerRadio] Updated listenerID: ' + newID.uid);
                 }
                 if (newID.expires && (listenerID.expires != newID.expires)) {
                     self.config.set("listenerIDexpiry", newID.expires)
-                    self.logger.info('[BauerRadio] Updated listenerID: ' + newID.expires);
-                 }
-            });
-                
-//    self.shallLogin()
+                    if (self.debug > 2) self.logger.info('[BauerRadio] Updated listenerID expiry timestamp: ' + newID.expires);
+                } else {
+                    if (self.debug > 2) self.logger.info('[BauerRadio] Kept same listenerID: ' + newID.uid);                    
+                }
+            });                
+    self.shallLogin();
 //        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password'), false))
 //        .then(()=>self.registerIPAddress())
 //        .then(()=>self.addToBrowseSources())
     // HACK
-    bRadio.setPremium(this.config.get("password"));
-    // HACK
-//    bRadio.setUserID(this.config.get("username"));
+    bRadio.setPremium(this.config.get("password"), false);
     self.addToBrowseSources();
-};
-
-ControllerBauerRadio.prototype.checkListenerID = function () {
-    let self=this;
-    let defer=libQ.defer();
-
-    let listenerID = { uid : self.config.get("listernerID"), expires : self.config.get("listenerIDexpiry")};
-    if (listenerID.expires <= Math.floor(Date.now() / 1000))
-        return bRadio.getListernerID();
-    else return defer.resolve(listenerID);
 };
 
 ControllerBauerRadio.prototype.shallLogin = function () {
     var self=this;
     var defer=libQ.defer()
-
-    if(this.config.get("loggedin",false) 
+    
+    this.isLoggedIn = this.config.get("loggedin",false);
+    if(this.isLoggedIn 
         && this.config.get("username")
         && this.config.get("username")!=""
         && this.config.get("password")
         && this.config.get("password")!="")
     {
+        if (self.debug > 2) self.logger.info('[BauerRadio] Sufficient credentials to try login.');
         defer.resolve()
     } else 
     {
+        if (self.debug > 2) self.logger.info('[BauerRadio] Not enough saved credentials.');
         defer.reject()
     }
     
@@ -255,9 +249,8 @@ ControllerBauerRadio.prototype.onStop = function () {
 ControllerBauerRadio.prototype.addToBrowseSources = function () {
     var self = this;
 
-    self.logger.info('Adding Bauer Radio to Browse Sources');
     var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.svg'};
-    self.logger.info('[BauerRadio] Adding browse source with: ' + data);
+    if (self.debug > 2) self.logger.info('[BauerRadio] Adding browse source with: ' + JSON.stringify(data));
     return self.commandRouter.volumioAddToBrowseSources(data);
 }
 
@@ -635,7 +628,7 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
         __dirname + '/UIConfig.json')
         .then(function(uiconf)
         {
-            if (self.isLoggedIn()) {
+            if (self.isLoggedIn) {
                 uiconf.sections[0].content[0].hidden=true;
                 uiconf.sections[0].content[1].hidden=true;
                 uiconf.sections[0].content[2].hidden=true;
@@ -699,7 +692,7 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
     var defer=libQ.defer();
 
     self.loginToBauerRadio(settings['BauerRadio_username'], settings['BauerRadio_password'], 'user')
-        .then(() => self.registerIPAddress())
+//        .then(() => self.registerIPAddress())
         .then(() => self.addToBrowseSources())
         .then(()=>{
             this.config.set('username', settings['BauerRadio_username'])
@@ -830,8 +823,6 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
         trackType: self.currentStation.trackType,
 //        radioType: 'bauerradio',
         albumart: metadata.albumart,
-//        uri: flacUri,
-//        name: metadata.title,
         title: metadata.title || '',  // make sure title is always a string
         artist: metadata.artist,
         album: metadata.album,
