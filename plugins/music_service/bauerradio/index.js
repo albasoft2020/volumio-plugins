@@ -42,6 +42,7 @@ function ControllerBauerRadio(context) {
     
     self.debug = 5;
     
+    self.userEmail = '';
     self.isLoggedIn = false;
     
     self.previousSong = '';
@@ -141,12 +142,16 @@ ControllerBauerRadio.prototype.startupLogin = function () {
                     if (self.debug > 2) self.logger.info('[BauerRadio] Kept same listenerID: ' + newID.uid);                    
                 }
             });                
-    self.shallLogin();
-//        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password'), false))
+    self.shallLogin()
+        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password')))
+        .then(()=>{
+            this.userEmail = this.config.get('username');
+            this.isLoggedIn = true;
+        })
 //        .then(()=>self.registerIPAddress())
 //        .then(()=>self.addToBrowseSources())
     // HACK
-    bRadio.setPremium(this.config.get("password"), false);
+//    bRadio.setPremium(this.config.get("password", false));
     self.addToBrowseSources();
 };
 
@@ -154,9 +159,8 @@ ControllerBauerRadio.prototype.shallLogin = function () {
     var self=this;
     var defer=libQ.defer()
     
-    this.isLoggedIn = this.config.get("loggedin",false);
-    if(this.isLoggedIn 
-        && this.config.get("username")
+//    this.isLoggedIn = this.config.get("loggedin",false);
+    if(this.config.get("username")
         && this.config.get("username")!=""
         && this.config.get("password")
         && this.config.get("password")!="")
@@ -173,11 +177,11 @@ ControllerBauerRadio.prototype.shallLogin = function () {
 };
 
 ControllerBauerRadio.prototype.loginToBauerRadio=function(username, password) {
-    var defer=libQ.defer()
-    var self=this;
+//    var defer=libQ.defer()
+//    var self=this;
 
-    self.logger.info('Loggin in to BauerRadio');
-
+//    this.logger.info('[BauerRadio] Attempting login using ' + username + ' and ' + password);   
+    
 //    unirest.post('https://users.hotelradio.fm/api/index/login')
 //        .send('username='+username)
 //        .send('password='+password)
@@ -201,8 +205,8 @@ ControllerBauerRadio.prototype.loginToBauerRadio=function(username, password) {
 //                defer.reject()
 //            }   
 //        })
-    defer.resolve();
-    return defer.promise
+//    defer.resolve();
+    return bRadio.loginToBauerRadio(username, password);
 }
 
 ControllerBauerRadio.prototype.registerIPAddress=function() {
@@ -635,7 +639,7 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 uiconf.sections[0].content[3].hidden=true;
                 //uiconf.sections[0].content[4].hidden=false;
                 
-                uiconf.sections[0].description=self.getI18n("BauerRadio.LOGGED_IN_EMAIL")+self.userEmail;
+                uiconf.sections[0].description=self.getI18n("BAUERRADIO.LOGGED_IN_EMAIL")+self.userEmail;
                 uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGOUT")
                 uiconf.sections[0].onSave.method="clearAccountCredentials"
             } else {
@@ -691,12 +695,14 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
     var self=this;
     var defer=libQ.defer();
 
-    self.loginToBauerRadio(settings['BauerRadio_username'], settings['BauerRadio_password'], 'user')
+    self.loginToBauerRadio(settings['bauerradio_username'], settings['bauerradio_password'])
 //        .then(() => self.registerIPAddress())
-        .then(() => self.addToBrowseSources())
+//        .then(() => self.addToBrowseSources())
         .then(()=>{
-            this.config.set('username', settings['BauerRadio_username'])
-            this.config.set('password',settings['BauerRadio_password'])
+            this.userEmail = settings['bauerradio_username'];
+            this.isLoggedIn = true;
+            this.config.set('username', settings['bauerradio_username'])
+            this.config.set('password',settings['bauerradio_password'])
 
             var config = self.getUIConfig();
             config.then(function(conf) {
@@ -720,7 +726,7 @@ ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
 
     self.logoutFromBauerRadio(settings['BauerRadio_username'], settings['BauerRadio_password'])
         //.then(() => self.registerIPAddress())
-        .then(() => self.commandRouter.volumioRemoveToBrowseSources('BauerRadio.fm'))
+        //.then(() => self.commandRouter.volumioRemoveToBrowseSources('BauerRadio.fm'))
         .then(()=>{
             var config = self.getUIConfig();
             config.then(function(conf) {
@@ -742,26 +748,27 @@ ControllerBauerRadio.prototype.logoutFromBauerRadio=function(username, password)
     var defer=libQ.defer()
     var self=this
 
-    unirest.post('https://users.hotelradio.fm/api/index/logout')
-        .send('username='+username)
-        .send('password='+password)
-        .then((response)=>{
-            if(response && 
-                response.cookies && 
-                'PHPSESSID' in response.cookies && 
-                response.status === 200 &&
-                response.body &&
-                response.body.code == 200)
-            {   
-                this.config.set('username', "")
-                this.config.set('password', "")
-                this.config.set("loggedin", false)
-
+//    unirest.post('https://users.hotelradio.fm/api/index/logout')
+//        .send('username='+username)
+//        .send('password='+password)
+//        .then((response)=>{
+//            if(response && 
+//                response.cookies && 
+//                'PHPSESSID' in response.cookies && 
+//                response.status === 200 &&
+//                response.body &&
+//                response.body.code == 200)
+//            {   
+                this.config.set('username', "");
+                this.config.set('password', "");
+                this.isLoggedIn = false;
+                this.userEmail = '';
+//
                 defer.resolve()
-            } else {
-                defer.reject()
-            }   
-        })
+//            } else {
+//                defer.reject()
+//            }   
+//        })
 
     return defer.promise;
 };
