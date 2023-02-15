@@ -1,4 +1,4 @@
-'use strict'
+'use strict';
 var unirest=require('unirest');
 var libQ=require('kew');
 var ip = require('public-ip');
@@ -18,7 +18,7 @@ const compositeTitle =
             separator: " - ",
             indexOfArtist: 1,
             indexOfTitle: 0
-        }
+        };
 /**
  * CONSTRUCTOR
  * 
@@ -136,7 +136,7 @@ ControllerBauerRadio.prototype.startupLogin = function () {
                     if (self.debug > 2) self.logger.info('[BauerRadio] Updated listenerID: ' + newID.uid);
                 }
                 if (newID.expires && (listenerID.expires != newID.expires)) {
-                    self.config.set("listenerIDexpiry", newID.expires)
+                    self.config.set("listenerIDexpiry", newID.expires);
                     if (self.debug > 2) self.logger.info('[BauerRadio] Updated listenerID expiry timestamp: ' + newID.expires);
                 } else {
                     if (self.debug > 2) self.logger.info('[BauerRadio] Kept same listenerID: ' + newID.uid);                    
@@ -147,7 +147,7 @@ ControllerBauerRadio.prototype.startupLogin = function () {
         .then(()=>{
             this.userEmail = this.config.get('username');
             this.isLoggedIn = true;
-        })
+        });
 //        .then(()=>self.registerIPAddress())
 //        .then(()=>self.addToBrowseSources())
     // HACK
@@ -166,77 +166,48 @@ ControllerBauerRadio.prototype.shallLogin = function () {
         && this.config.get("password")!="")
     {
         if (self.debug > 2) self.logger.info('[BauerRadio] Sufficient credentials to try login.');
-        defer.resolve()
+        defer.resolve();
     } else 
     {
         if (self.debug > 2) self.logger.info('[BauerRadio] Not enough saved credentials.');
-        defer.reject()
+        defer.reject();
     }
     
-    return defer.promise
+    return defer.promise;
 };
 
 ControllerBauerRadio.prototype.loginToBauerRadio=function(username, password) {
-//    var defer=libQ.defer()
-//    var self=this;
-
-//    this.logger.info('[BauerRadio] Attempting login using ' + username + ' and ' + password);   
-    
-//    unirest.post('https://users.hotelradio.fm/api/index/login')
-//        .send('username='+username)
-//        .send('password='+password)
-//        .then((response)=>{
-//            if(response && 
-//                response.cookies && 
-//                'PHPSESSID' in response.cookies && 
-//                response.status === 200 &&
-//                response.body &&
-//                'user' in response.body &&
-//                'id' in response.body['user'])
-//            {
-//                self.sessionId=response.cookies['PHPSESSID']
-//                
-//                self.userId=response.body['user']["id"]
-//                self.userEmail=response.body['user']["email"]
-//                
-//                self.config.set("loggedin",true)
-//                defer.resolve()
-//            } else {
-//                defer.reject()
-//            }   
-//        })
-//    defer.resolve();
     return bRadio.loginToBauerRadio(username, password);
-}
+};
 
-ControllerBauerRadio.prototype.registerIPAddress=function() {
-    var self=this
-    var defer=libQ.defer()
-    
-    ip.v4().then((address)=>{
-        var cookieJar=unirest.jar()
-        cookieJar.add('PHPSESSID='+self.sessionId,'https://users.hotelradio.fm/api/user/updateip')
-
-        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
-            .jar(cookieJar)
-            .send('id='+self.userId)
-            .send('ip='+address)
-            .then((response)=>{
-                if(response && 
-                    response.status === 200 &&
-                    'user' in response.body)
-                {
-                    defer.resolve()
-                } else {
-                    defer.reject()
-                }   
-            })
-    }).catch((error)=>{
-        defer.reject()
-    })
-
-    return defer.promise
-}
+//ControllerBauerRadio.prototype.registerIPAddress=function() {
+//    var self=this
+//    var defer=libQ.defer()
+//    
+//    ip.v4().then((address)=>{
+//        var cookieJar=unirest.jar()
+//        cookieJar.add('PHPSESSID='+self.sessionId,'https://users.hotelradio.fm/api/user/updateip')
+//
+//        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
+//            .jar(cookieJar)
+//            .send('id='+self.userId)
+//            .send('ip='+address)
+//            .then((response)=>{
+//                if(response && 
+//                    response.status === 200 &&
+//                    'user' in response.body)
+//                {
+//                    defer.resolve()
+//                } else {
+//                    defer.reject()
+//                }   
+//            })
+//    }).catch((error)=>{
+//        defer.reject()
+//    })
+//
+//    return defer.promise
+//}
 
 ControllerBauerRadio.prototype.onStop = function () {
     var self = this;
@@ -282,47 +253,6 @@ ControllerBauerRadio.prototype.handleBrowseUri = function (curUri) {
 ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     var defer=libQ.defer();
     var self=this;
-
-//    var cookieJar = unirest.jar()
-//    cookieJar.add('PHPSESSID=' + this.sessionId, 'https://users.hotelradio.fm/api/channelgroups/user')
-
-//    var request = unirest.post('https://users.hotelradio.fm/api/channelgroups/user')
-//        .jar(cookieJar)
-//        .send('id=' + this.userId)
-//        .then((response) => {
-//            if (response &&
-//                response.status === 200 &&
-//                'channel_groups' in response.body) {
-//                var groupItems = []
-//                response.body['channel_groups'].map(group => {
-//                    groupItems.push({
-//                        "type": "item-no-menu",
-//                        "title": group['group_name'],
-//                        "albumart": group['group_cover'],
-//                        "uri": `BauerRadio://${group['id']}`
-//                    })
-//                })
-//
-//                var browseResponse={
-//                    "navigation": {
-//                        "lists": [
-//                            {
-//                                "type": "title",
-//                                "title": "TRANSLATE.BauerRadio.GROUPS",
-//                                "availableListViews": [
-//                                    "grid", "list"
-//                                ],
-//                                "items": groupItems
-//                            }]
-//                    }
-//                }
-//                self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
-//
-//                defer.resolve(browseResponse)
-//            } else {
-//                defer.reject()
-//            }
-//        })
 
     var groupItems = [];
     
@@ -387,7 +317,6 @@ ControllerBauerRadio.prototype.handleStationBrowseUri=function(curUri) {
                     "service":"bauerradio"
                 });
             });
-//            console.log(stationItems[28]);
             
             var browseResponse={
                 "navigation": {
@@ -649,35 +578,35 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 uiconf.sections[0].content[3].hidden=true;
                 //uiconf.sections[0].content[4].hidden=true;
 
-                switch(self.commandRouter.sharedVars.get('language_code'))
-                {
-                    case 'de':
-                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/volumio";
-                    break
-
-                    case 'it':
-                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/it/volumio";
-                    break
-
-                    case 'fr':
-                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/fr/volumio";
-                    break
-
-                    case 'es':
-                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/es/volumio";
-                    break
-
-                    default:
-                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/en/volumio";
-                    break
-
-
-                }
+//                switch(self.commandRouter.sharedVars.get('language_code'))
+//                {
+//                    case 'de':
+//                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/volumio";
+//                    break
+//
+//                    case 'it':
+//                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/it/volumio";
+//                    break
+//
+//                    case 'fr':
+//                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/fr/volumio";
+//                    break
+//
+//                    case 'es':
+//                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/es/volumio";
+//                    break
+//
+//                    default:
+//                        uiconf.sections[0].content[0].onClick.performerUrl="https://hotelradio.fm/en/volumio";
+//                    break
+//
+//
+//                }
                 
 
-                uiconf.sections[0].description=self.getI18n("BAUERRADIO.ACCOUNT_LOGIN_DESC")
-                uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGIN")
-                uiconf.sections[0].onSave.method="saveAccountCredentials"
+                uiconf.sections[0].description=self.getI18n("BAUERRADIO.ACCOUNT_LOGIN_DESC");
+                uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGIN");
+                uiconf.sections[0].onSave.method="saveAccountCredentials";
             }
 
             defer.resolve(uiconf);
@@ -701,8 +630,8 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
         .then(()=>{
             this.userEmail = settings['bauerradio_username'];
             this.isLoggedIn = true;
-            this.config.set('username', settings['bauerradio_username'])
-            this.config.set('password',settings['bauerradio_password'])
+            this.config.set('username', settings['bauerradio_username']);
+            this.config.set('password',settings['bauerradio_password']);
 
             var config = self.getUIConfig();
             config.then(function(conf) {
@@ -710,43 +639,42 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
             });
 
             self.commandRouter.pushToastMessage('success', self.getI18n('COMMON.LOGGED_IN'));
-            defer.resolve({})
+            defer.resolve({});
         })
         .fail(()=>{
             self.commandRouter.pushToastMessage('error', self.getI18n('COMMON.ERROR_LOGGING_IN'));
-            defer.reject()
-        })
+            defer.reject();
+        });
     
-    return defer.promise
-}
+    return defer.promise;
+};
 
 ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
     var self=this;
     var defer=libQ.defer();
 
     self.logoutFromBauerRadio(settings['BauerRadio_username'], settings['BauerRadio_password'])
-        //.then(() => self.registerIPAddress())
         //.then(() => self.commandRouter.volumioRemoveToBrowseSources('BauerRadio.fm'))
         .then(()=>{
             var config = self.getUIConfig();
             config.then(function(conf) {
                 self.commandRouter.broadcastMessage('pushUiConfig', conf);
-            })
+            });
 
             self.commandRouter.pushToastMessage('success', self.getI18n('COMMON.LOGGED_OUT'));
-            defer.resolve({})
+            defer.resolve({});
         })
         .fail(()=>{
             self.commandRouter.pushToastMessage('error', self.getI18n('COMMON.ERROR_LOGGING_OUT'));
-            defer.reject()
-        })
+            defer.reject();
+        });
     
-    return defer.promise
+    return defer.promise;
 }
 
 ControllerBauerRadio.prototype.logoutFromBauerRadio=function(username, password) {
-    var defer=libQ.defer()
-    var self=this
+    var defer=libQ.defer();
+    var self=this;
 
 //    unirest.post('https://users.hotelradio.fm/api/index/logout')
 //        .send('username='+username)
@@ -777,30 +705,30 @@ ControllerBauerRadio.prototype.isLoggedIn = function () {
     return this.config.get("loggedin", false);
 };
 
-ControllerBauerRadio.prototype.startRefreshCron=function() {
-    var self=this;
+//ControllerBauerRadio.prototype.startRefreshCron=function() {
+//    var self=this;
+//
+//    this.stopRefreshCron();
+//
+//    // Refreshing login every 12 hours
+//    var m=moment();
+//    var cronString=m.second()+' '+m.minute()+' '+m.hour()+','+(m.hour()+12)%24+' * * *';
+//    this.accessTokenRefreshCron=cron.scheduleJob(cronString, () => {
+//        self.startupLogin();
+//    });
+//
+//    this.logger.info('AccessToken refresher cron started for Bauer Radio');
+//};
 
-    this.stopRefreshCron();
-
-    // Refreshing login every 12 hours
-    var m=moment();
-    var cronString=m.second()+' '+m.minute()+' '+m.hour()+','+(m.hour()+12)%24+' * * *';
-    this.accessTokenRefreshCron=cron.scheduleJob(cronString, () => {
-        self.startupLogin();
-    });
-
-    this.logger.info('AccessToken refresher cron started for Bauer Radio');
-};
-
-ControllerBauerRadio.prototype.stopRefreshCron=function() {
-    if(this.accessTokenRefreshCron)
-    {
-        this.accessTokenRefreshCron.cancel()
-        this.accessTokenRefreshCron=undefined
-    }
-
-    this.logger.info('Stopping AccessToken refresher cron for Bauer	Radio');
-};
+//ControllerBauerRadio.prototype.stopRefreshCron=function() {
+//    if(this.accessTokenRefreshCron)
+//    {
+//        this.accessTokenRefreshCron.cancel()
+//        this.accessTokenRefreshCron=undefined
+//    }
+//
+//    this.logger.info('Stopping AccessToken refresher cron for Bauer	Radio');
+//};
     
 ControllerBauerRadio.prototype.pushState = function (state) {
     
