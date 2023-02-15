@@ -126,7 +126,7 @@ ControllerBauerRadio.prototype.startupLogin = function () {
     let listenerID = { uid : '', expires : 0};
     let id = self.config.get("listenerID");
     
-    if (id) { listenerID.uid = id; listenerID.expires = self.config.get("listenerIDexpiry") };
+    if (id) { listenerID.uid = id; listenerID.expires = self.config.get("listenerIDexpiry"); };
     if (self.debug) self.logger.info('[BauerRadio] Starting up. Saved listenerID: ', listenerID);
     
     bRadio.setUserID(listenerID)
@@ -143,7 +143,7 @@ ControllerBauerRadio.prototype.startupLogin = function () {
                 }
             });                
     self.shallLogin()
-        .then(()=>self.loginToBauerRadio(this.config.get('username'), this.config.get('password')))
+        .then(()=> self.loginToBauerRadio(this.config.get('username'), this.config.get('password')))
         .then(()=>{
             this.userEmail = this.config.get('username');
             this.isLoggedIn = true;
@@ -568,7 +568,7 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 uiconf.sections[0].content[3].hidden=true;
                 //uiconf.sections[0].content[4].hidden=false;
                 
-                uiconf.sections[0].description=self.getI18n("BAUERRADIO.LOGGED_IN_EMAIL")+self.userEmail;
+                uiconf.sections[0].description=self.getI18n("BAUERRADIO.LOGGED_IN_EMAIL")+bRadio.getCurrentUserDescription();
                 uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGOUT")
                 uiconf.sections[0].onSave.method="clearAccountCredentials"
             } else {
@@ -624,7 +624,7 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
     var self=this;
     var defer=libQ.defer();
 
-    self.loginToBauerRadio(settings['bauerradio_username'], settings['bauerradio_password'])
+    bRadio.loginToBauerRadio(settings['bauerradio_username'], settings['bauerradio_password'])
 //        .then(() => self.registerIPAddress())
 //        .then(() => self.addToBrowseSources())
         .then(()=>{

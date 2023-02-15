@@ -11,7 +11,7 @@ const stations = new Map();
 const brands = new Map();
 let lastBrandsUpdate = -1;
 
-let premiumUser = true;
+let premiumUser = false;
 let preferACC = true;
 let uid = '';
 let realTimeNowPlaying = '';
@@ -28,8 +28,12 @@ const currentStation = {
     "trackType":''
 };
     
+const currentUser = {
+    email : '',
+    premiumState : '',
+    premiumExpiresAt : 0
+};
 
-//premiumUser = false;
 // ======================= START OF MODULE EXPORT
 module.exports = {
 // ======================= Tools (called from outside)
@@ -430,13 +434,13 @@ module.exports = {
 //                    // the following does NOT work, as it only sees the empty XSRF-TOKEN:
 //                    console.log('Cookies: ',JSON.stringify(response.cookies));
                     bauerCookies = response.headers['set-cookie'];
-                    console.log('Set-Cookie array: ',JSON.stringify(bauerCookies));
+//                    console.log('Set-Cookie array: ',JSON.stringify(bauerCookies));
 //                    let cookieJar=unirest.jar();
                     // Dirty hack: assumes the relevant cookie is always the first one...
                     let XSRFtoken = cookie.parse(response.headers['set-cookie'][0]);
-                    console.log('XSRF-TOKEN cookie: ', XSRFtoken);
+//                    console.log('XSRF-TOKEN cookie: ', XSRFtoken);
+//
                     //cookieJar.add(response.headers['set-cookie'][0]);
-
 //                    console.log('Cookie jar: ',JSON.stringify(cookieJar));
                     unirest.post(targetstep2)
                         .header('Accept', 'application/json, text/plain, */*')
@@ -455,21 +459,32 @@ module.exports = {
                         .then((response) => {
                             console.log('Step2 response: ', JSON.stringify(response));
                             // Should do some error checking here
-                            if (response.headers['set-cookie']) bauerCookies = bauerCookies.concat(response.headers['set-cookie']);
-                            console.log('All Cookies: ',JSON.stringify(bauerCookies));
-                            if ((response.body) && (response.body.miscellaneous)){
-                                premiumUser = ['active','trial'].includes(response.body.miscellaneous.premiumState);
-                                console.log('PremiumState: ', response.body.miscellaneous.premiumState);
-                            } else premiumUser = false;
-                            console.log('Premium user? ', premiumUser);
+                            if (response.status === 200){
+                                // Successfully logged in
+//                                console.log('All Cookies: ',JSON.stringify(bauerCookies));
+                                currentUser.email = username;
+                                if ((response.body) && (response.body.miscellaneous)){
+                                    premiumUser = ['active','trial'].includes(response.body.miscellaneous.premiumState);
+                                    currentUser.premiumState = response.body.miscellaneous.premiumState;
+                                    currentUser.premiumExpiresAt = response.body.miscellaneous.premiumExpiresAt
+//                                    console.log('PremiumState: ', response.body.miscellaneous.premiumState);
+                                } else premiumUser = false;
+//                                console.log('Premium user? ', premiumUser);
+                                if (response.headers['set-cookie']) bauerCookies = bauerCookies.concat(response.headers['set-cookie']);
+                                let userDetails = response.body;
+                                defer.resolve(currentUser);
+                            } else if (response.status === 403){
+                                defer.reject(response.body);
+                            } else if (response.status === 404){
+//                                defer.reject(new Error('Credentials not valid'));
+                                defer.reject('Credentials not valid');
+                             }
                         });
-
-                    let userDetails = response.body;
-                    defer.resolve(userDetails);
                 } else {
-                    defer.reject(new Error('Failed to retrieve event data from URL: ' ));
+                    defer.reject('Failed to retrieve response from account URL');
                 }
-            });
+            })
+//            .fail((e) => { defer.reject(e); });
 //    unirest.post('https://users.hotelradio.fm/api/index/login')
 //        .send('username='+username)
 //        .send('password='+password)
@@ -500,6 +515,24 @@ module.exports = {
 //        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
 //            .jar(cookieJar)
         return defer.promise;
+    },
+    
+    getCurrentUser: function(){
+        return currentUser;
+    },
+
+    getCurrentUserDescription: function(){
+        let desc = 'Not logged in.';
+        
+        if (currentUser.email) {
+            desc = currentUser.email;
+            if (['active','trial'].includes(currentUser.premiumState)) {
+                desc += ' (' + currentUser.premiumState + ' premium user, subscribed until ' + currentUser.premiumExpiresAt + ')'
+            } else {
+                desc += ' (no current premium subscription)';
+            }
+        }
+        return desc;
     },
 
     getListenerID: function() {

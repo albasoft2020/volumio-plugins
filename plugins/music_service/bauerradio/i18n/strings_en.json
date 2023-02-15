@@ -22,6 +22,6 @@
     "RESET_PASSWORD":"Reset",
     "RESET_PASSWORD_DESCR":"Reset your account password",
     "FREE_TRIAL_ACTIVE":"Free trial is active",
-    "LOGGED_IN_EMAIL":"Logged in as "
+    "LOGGED_IN_EMAIL":"  Logged in as "
   }
 }
