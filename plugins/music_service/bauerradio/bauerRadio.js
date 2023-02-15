@@ -429,7 +429,7 @@ module.exports = {
 //            .header('Sec-Fetch-User', '?1')
 //            .header('Cache-Control', 'no-cache')
             .then((response) => {
-                console.log('Response headers: ' ,JSON.stringify(response.headers));
+//                console.log('Response headers: ' ,JSON.stringify(response.headers));
                 if (response && response.status === 200 && response.cookies && 'XSRF-TOKEN' in response.cookies) {
 //                    // the following does NOT work, as it only sees the empty XSRF-TOKEN:
 //                    console.log('Cookies: ',JSON.stringify(response.cookies));
@@ -457,7 +457,7 @@ module.exports = {
                             "password": password
                         })
                         .then((response) => {
-                            console.log('Step2 response: ', JSON.stringify(response));
+//                            console.log('Step2 response: ', JSON.stringify(response));
                             // Should do some error checking here
                             if (response.status === 200){
                                 // Successfully logged in
@@ -483,37 +483,7 @@ module.exports = {
                 } else {
                     defer.reject('Failed to retrieve response from account URL');
                 }
-            })
-//            .fail((e) => { defer.reject(e); });
-//    unirest.post('https://users.hotelradio.fm/api/index/login')
-//        .send('username='+username)
-//        .send('password='+password)
-//        .then((response)=>{
-//            if(response && 
-//                response.cookies && 
-//                'PHPSESSID' in response.cookies && 
-//                response.status === 200 &&
-//                response.body &&
-//                'user' in response.body &&
-//                'id' in response.body['user'])
-//            {
-//                self.sessionId=response.cookies['PHPSESSID']
-//                
-//                self.userId=response.body['user']["id"]
-//                self.userEmail=response.body['user']["email"]
-//                
-//                self.config.set("loggedin",true)
-//                defer.resolve()
-//            } else {
-//                defer.reject()
-//            }   
-//        })
-//        
-//        var cookieJar=unirest.jar()
-//        cookieJar.add('PHPSESSID='+self.sessionId,'https://users.hotelradio.fm/api/user/updateip')
-//
-//        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
-//            .jar(cookieJar)
+            });
         return defer.promise;
     },
     
