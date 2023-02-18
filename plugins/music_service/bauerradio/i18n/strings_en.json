@@ -22,6 +22,11 @@
     "RESET_PASSWORD":"Reset",
     "RESET_PASSWORD_DESCR":"Reset your account password",
     "FREE_TRIAL_ACTIVE":"Free trial is active",
-    "LOGGED_IN_EMAIL":"  Logged in as "
+    "LOGGED_IN_EMAIL":"  Logged in as ",
+	"DEBUGSETTINGS":"BauerRadio Plugin Debug Settings",
+	"D_DEBUGSETTINGS":"Configure debug level for the plugin",
+	"SAVE":"Save",
+	"ENABLE_DEBUG_LOGGING":"Debug level",
+	"D_ENABLE_DEBUG_LOGGING":"0: no debug info, higher numbers give more detailed debug info"
   }
 }

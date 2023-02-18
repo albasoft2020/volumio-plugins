@@ -58,6 +58,34 @@
           "hidden":true
         }
       ]
-    }
+    },
+	{
+		"id": "section_debugsettings",
+		"element": "section",
+		"label": "TRANSLATE.BAUERRADIO.DEBUGSETTINGS",
+		"description": "TRANSLATE.BAUERRADIO.D_DEBUGSETTINGS",
+		"icon": "fa-bug",
+		"onSave": {
+			"type": "controller",
+			"endpoint": "music_service/bauerradio",
+			"method": "updateDebugSettings"
+		},
+		"saveButton": {
+			"label": "TRANSLATE.BAUERRADIO.SAVE",
+			"data": [
+				"debugLevel"
+			]
+		},
+		"content": [
+			{
+			  "id":"debugLevel",
+			  "type": "text",
+			  "element": "input",
+			  "label": "TRANSLATE.BAUERRADIO.ENABLE_DEBUG_LOGGING",
+			  "doc": "TRANSLATE.BAUERRADIO.D_ENABLE_DEBUG_LOGGING",
+			  "value": "0"
+			}
+		]
+	}
   ]
 }

@@ -40,7 +40,7 @@ function ControllerBauerRadio(context) {
     self.updateService = 'bauerradio';
     self.currentStation;
     
-    self.debug = 5;
+    self.debug = 0;  // define debug level
     
     self.userEmail = '';
     self.isLoggedIn = false;
@@ -72,6 +72,7 @@ ControllerBauerRadio.prototype.onVolumioStart = function () {
 ControllerBauerRadio.prototype.onStart = function () {
     var defer=libQ.defer();
 
+    this.debug = this.config.get('debugLevel', 0);
     this.loadI18n();
     this.startupLogin();
 //    this.startRefreshCron();
@@ -607,6 +608,10 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 uiconf.sections[0].description=self.getI18n("BAUERRADIO.ACCOUNT_LOGIN_DESC");
                 uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGIN");
                 uiconf.sections[0].onSave.method="saveAccountCredentials";
+                
+                // Debug section
+                uiconf.sections[1].content[0].value = self.debug;
+		
             }
 
             defer.resolve(uiconf);
@@ -647,6 +652,25 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
         });
     
     return defer.promise;
+};
+
+/**
+* Update Debug Settings, changing the level of detailed logged
+* 0 : only errors logged; for higher numbers increasingly more detail is logged
+ * @param {type} data
+ * @returns {.libQ@call;defer.promise} */
+ ControllerBauerRadio.prototype.updateDebugSettings = function (data)
+{
+	var self = this;
+	var defer=libQ.defer();
+
+    self.debug = parseInt(data['debugLevel']) || 0;
+	self.config.set('debugLevel', self.debug);
+	defer.resolve();
+	
+    self.commandRouter.pushToastMessage('success', "Saved settings", "Set debug level to " + self.debug);
+
+	return defer.promise;
 };
 
 ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
@@ -896,14 +920,14 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
         self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
         if (metadata){
             if(metadata.unchanged) {
-                if (self.debug > 2) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
                 if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 return libQ.resolve();
             }
             else {
                 return libQ.resolve(self.pushSongState(metadata, playState))
                 .then(function () {
-                    if (self.debug > 2) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+                    if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
                     if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 });
             }
