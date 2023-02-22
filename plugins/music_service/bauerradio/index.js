@@ -603,17 +603,13 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
 //
 //
 //                }
-                
-
                 uiconf.sections[0].description=self.getI18n("BAUERRADIO.ACCOUNT_LOGIN_DESC");
                 uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGIN");
                 uiconf.sections[0].onSave.method="saveAccountCredentials";
-                
-                // Debug section
-                uiconf.sections[1].content[0].value = self.debug;
-		
             }
-
+                
+            // Debug section
+            uiconf.sections[1].content[0].value = self.debug;
             defer.resolve(uiconf);
         })
         .fail(function(e)
