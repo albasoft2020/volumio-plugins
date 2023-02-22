@@ -419,7 +419,7 @@ module.exports = {
 //          This is the firefox string:
 //            .header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/109.0')
 //          But maybe using a curl string is a bit closer to reality
-            .header('User-Agent', 'curl/7.64.1')
+            .header('User-Agent', 'curl/7.74.0')
 //          All these do not seem to be required after all:
 //            .header('Accept-Language', 'en-GB,en;q=0.5')
 //            .header('Accept-Encoding', 'gzip, deflate, br')
@@ -458,7 +458,6 @@ module.exports = {
                         })
                         .then((response) => {
 //                            console.log('Step2 response: ', JSON.stringify(response));
-                            // Should do some error checking here
                             if (response.status === 200){
                                 // Successfully logged in
 //                                console.log('All Cookies: ',JSON.stringify(bauerCookies));
@@ -471,7 +470,7 @@ module.exports = {
                                 } else premiumUser = false;
 //                                console.log('Premium user? ', premiumUser);
                                 if (response.headers['set-cookie']) bauerCookies = bauerCookies.concat(response.headers['set-cookie']);
-                                let userDetails = response.body;
+//                                let userDetails = response.body;
                                 defer.resolve(currentUser);
                             } else if (response.status === 403){
                                 defer.reject(response.body);
@@ -491,6 +490,16 @@ module.exports = {
         return currentUser;
     },
 
+    forgetCurrentUser: function(){
+        currentUser = {
+            email : '',
+            premiumState : '',
+            premiumExpiresAt : 0
+        };
+        bauerCookies = [];
+        return currentUser;
+    },
+    
     getCurrentUserDescription: function(){
         let desc = 'Not logged in.';
         
@@ -505,6 +514,27 @@ module.exports = {
         return desc;
     },
 
+    checkIfLoggedIn: function() {
+
+        var defer=libQ.defer();
+        
+        const targetcookiedomain1 = 'account.planetradio.co.uk';
+        const targetcookiedomain2 = 'planetradio.co.uk';
+        const target1 = 'https://account.planetradio.co.uk';
+        const targetrefresh = 'https://account.planetradio.co.uk//user/api/me/';
+                        
+        unirest
+            // We don't need to get the body; all the info we need is in the return header...
+            .get(targetrefresh)
+            .header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8, application/json, text/plain, */*')
+            .header('User-Agent', 'curl/7.74.0')
+            .header('cookie', bauerCookies)
+            .then((response) => {
+                console.log('Response: ' ,JSON.stringify(response));
+            });
+        return defer.promise;
+    },
+    
     getListenerID: function() {
 
         var defer=libQ.defer();
@@ -516,8 +546,8 @@ module.exports = {
             // We don't need to get the body; all the info we need is in the return header...
             .head(target2)
             .header('Accept', '*/*')
-//          // 'User-Agent' , but passing this in header seems to affect which ID gets returned...
-            .header('User-Agent', 'curl/7.64.1')
+//          // 'User-Agent' , not needed but passing this in header seems to affect which ID gets returned...
+            .header('User-Agent', 'curl/7.74.0')
             .header('Referer', target1)
             .then((response) => {
 //                console.log('Response headers: ' ,JSON.stringify(response));

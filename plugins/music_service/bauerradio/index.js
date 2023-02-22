@@ -63,6 +63,7 @@ ControllerBauerRadio.prototype.onVolumioStart = function () {
     var configFile=this.commandRouter.pluginManager.getConfigurationFile(this.context,'config.json');
     this.config = new (require('v-conf'))();
     this.config.loadFile(configFile);
+    this.debug = this.config.get('debugLevel', 0);
 
     defer.resolve('');
 
@@ -72,7 +73,6 @@ ControllerBauerRadio.prototype.onVolumioStart = function () {
 ControllerBauerRadio.prototype.onStart = function () {
     var defer=libQ.defer();
 
-    this.debug = this.config.get('debugLevel', 0);
     this.loadI18n();
     this.startupLogin();
 //    this.startRefreshCron();
