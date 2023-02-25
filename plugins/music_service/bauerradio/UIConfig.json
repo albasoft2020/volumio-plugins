@@ -68,8 +68,13 @@
 		"onSave": {
 			"type": "controller",
 			"endpoint": "music_service/bauerradio",
-			"method": "updateDebugSettings"
+			"method": "rescanStations"
 		},
+	    "saveButton": {
+			"label": "Refresh Station list",
+			"data": [
+			]
+        },
 		"content": [
 			{
 			  "id":"stationsStatus",

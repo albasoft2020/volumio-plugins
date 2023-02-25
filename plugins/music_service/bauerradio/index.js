@@ -288,7 +288,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     // fetch list of stations (if needed)
     bRadio.getLiveStations()
         .then((response) => {
-            self.logger.info('[BauerRadio] Checked live station list. Number of stations found: ', response.size);
+            self.logger.info('[BauerRadio] Checked live station list. Number of stations found: ' + response.size);
             defer.resolve(browseResponse);
         });
     return defer.promise;
@@ -678,6 +678,22 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
 	return defer.promise;
 };
 
+ ControllerBauerRadio.prototype.rescanStations = function ()
+{
+	var self = this;
+	var defer=libQ.defer();
+
+    bRadio.getLiveStations(true)
+           .then((stations) =>  {
+                self.commandRouter.pushToastMessage('success', "Live station list", "Successfully loaded " + stations.size + " stations.");
+                defer.resolve();
+            })
+            .fail(() => defer.reject());
+
+	return defer.promise;
+};
+ 
+ 
 ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
     var self=this;
     var defer=libQ.defer();
@@ -701,7 +717,7 @@ ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
     return defer.promise;
 }
 
-ControllerBauerRadio.prototype.logoutFromBauerRadio=function() {
+ControllerBauerRadio.prototype.logoutFromBauerRadio=function(username, password) {
 
     this.config.set('username', "");
     this.config.set('password', "");

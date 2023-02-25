@@ -496,6 +496,7 @@ module.exports = {
             premiumState : '',
             premiumExpiresAt : 0
         };
+        premiumUser = false;
         bauerCookies = [];
         return currentUser;
     },
