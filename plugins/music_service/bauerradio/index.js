@@ -607,9 +607,18 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGIN");
                 uiconf.sections[0].onSave.method="saveAccountCredentials";
             }
-                
+            // Status section
+            let status = '';
+            if (self.timer) {
+                status = 'Monitoring currently playing station';
+                if (bRadio.realTimeNowPlaying()) status += ' using realtime Now Playing URL.'
+                else status += ' using mpd status info.'
+            }
+            else status = 'Now playing not being monitored :-(';
+            uiconf.sections[1].description=status;  
+            
             // Debug section
-            uiconf.sections[1].content[0].value = self.debug;
+            uiconf.sections[2].content[0].value = self.debug;
             defer.resolve(uiconf);
         })
         .fail(function(e)
@@ -692,33 +701,13 @@ ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
     return defer.promise;
 }
 
-ControllerBauerRadio.prototype.logoutFromBauerRadio=function(username, password) {
-    var defer=libQ.defer();
-    var self=this;
+ControllerBauerRadio.prototype.logoutFromBauerRadio=function() {
 
-//    unirest.post('https://users.hotelradio.fm/api/index/logout')
-//        .send('username='+username)
-//        .send('password='+password)
-//        .then((response)=>{
-//            if(response && 
-//                response.cookies && 
-//                'PHPSESSID' in response.cookies && 
-//                response.status === 200 &&
-//                response.body &&
-//                response.body.code == 200)
-//            {   
-                this.config.set('username', "");
-                this.config.set('password', "");
-                this.isLoggedIn = false;
-                this.userEmail = '';
-//
-                defer.resolve()
-//            } else {
-//                defer.reject()
-//            }   
-//        })
-
-    return defer.promise;
+    this.config.set('username', "");
+    this.config.set('password', "");
+    this.isLoggedIn = false;
+    this.userEmail = '';
+    return bRadio.forgetCurrentUser();
 };
 
 ControllerBauerRadio.prototype.isLoggedIn = function () {
@@ -904,12 +893,14 @@ ControllerBauerRadio.prototype.getMetadata = function () {
 
 ControllerBauerRadio.prototype.setMetadata = function (playState) {
     let self = this;
+    let defer = libQ.defer();
     
     if (playState == 'stop') {
         if (self.timer) {
             self.logger.info('[BauerRadio] Stopping timer');
             self.timer.clear();
         }
+//        defer.resolve(self.pushSongState(self.currentStation, playState));
         return libQ.resolve(self.pushSongState(self.currentStation, playState));
     } else return self.getMetadata()
     .then(function(metadata) {

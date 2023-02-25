@@ -7,7 +7,7 @@
       "id": "BAUERRADIO_SECTION",
       "element": "section",
       "label": "TRANSLATE.BAUERRADIO.SECTION_ACCOUNT",
-      "image": "fa-user",
+      "icon": "fa-user",
       "description": "TRANSLATE.BAUERRADIO.ACCOUNT_LOGIN_DESC",
       "hidden":false,
       "onSave": {
@@ -24,7 +24,7 @@
       },
       "content": [
         {
-          "id":"hotelradio_free_trial",
+          "id":"bauerradio_signup",
           "element": "button",
           "label": "TRANSLATE.BAUERRADIO.FREE_TRIAL",
           "description": "TRANSLATE.BAUERRADIO.FREE_TRIAL_DESCR",
@@ -59,6 +59,27 @@
         }
       ]
     },
+	{
+		"id": "section_status",
+		"element": "section",
+		"label": "Status",
+		"description": "Current service status",
+		"icon": "fa-info",
+		"onSave": {
+			"type": "controller",
+			"endpoint": "music_service/bauerradio",
+			"method": "updateDebugSettings"
+		},
+		"content": [
+			{
+			  "id":"stationsStatus",
+			  "type": "text",
+			  "element": "output",
+			  "label": "Last station refresh:",
+			  "value": "0"
+			}
+		]
+	},
 	{
 		"id": "section_debugsettings",
 		"element": "section",

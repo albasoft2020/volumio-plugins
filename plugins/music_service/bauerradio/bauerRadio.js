@@ -39,11 +39,11 @@ module.exports = {
 // ======================= Tools (called from outside)
 
     // Get a map of BauerRadio live stations
-    getLiveStations: function () {
-    //function getLiveStations (){
+    getLiveStations: function (refresh) {
+
         var defer=libQ.defer();
         
-        if (stations.size> 0) {
+        if (!refresh && (stations.size> 0)) {
             defer.resolve(stations);
             console.log('Returned existing map');
         }
@@ -506,7 +506,7 @@ module.exports = {
         if (currentUser.email) {
             desc = currentUser.email;
             if (['active','trial'].includes(currentUser.premiumState)) {
-                desc += ' (' + currentUser.premiumState + ' premium user, subscribed until ' + currentUser.premiumExpiresAt + ')'
+                desc += ' (' + currentUser.premiumState + ' premium user, with current subscription valid until ' + currentUser.premiumExpiresAt + ')'
             } else {
                 desc += ' (no current premium subscription)';
             }
