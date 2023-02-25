@@ -10,6 +10,12 @@ const NowPlayingUrl = 'https://listenapi.planetradio.co.uk/api9.2/nowplaying';
 const stations = new Map();
 const brands = new Map();
 let lastBrandsUpdate = -1;
+const stationsStats = {
+    total : 0,
+    premium : 0,
+    brands : 0,
+    updated : 0
+}
 
 let premiumUser = false;
 let preferACC = true;
@@ -50,7 +56,8 @@ module.exports = {
         else {
             let premium = "";
             if (premiumUser) premium = "?premium=1"
-        
+            stations.clear();
+            brands.clear();
             console.log('Requesting info through web. Include premium stations: ' + premiumUser);
             unirest
                 .get(`https://listenapi.planetradio.co.uk/api9.2/stations/gb${premium}`)
@@ -58,6 +65,8 @@ module.exports = {
                     if (response &&
                         response.status === 200) {
     //                    const stations = new Map();
+                        stationsStats.updated = Date.now();
+                        stationsStats.premium = 0;
                         for (var station in response.body) {
             //                    console.log(station);
                             let brandID = response.body[station]['stationBrandCode'];
@@ -68,6 +77,7 @@ module.exports = {
                                 "brand": brandID,
                                 "premiumOnlyStation": response.body[station]['premiumOnlyStation']
                             });
+                            if (response.body[station]['premiumOnlyStation']) stationsStats.premium++;
                             var brand;
                             if (brands.has(brandID)){
                                 brand = brands.get(brandID);
@@ -83,6 +93,8 @@ module.exports = {
                         }
         //                console.log(response.body[28]);
         //                console.log(stations.get('jaz'))  
+                        stationsStats.total = stations.size;
+                        stationsStats.brands = brands.size;
                         defer.resolve(stations);
                     } else {
                         defer.reject();
@@ -90,6 +102,10 @@ module.exports = {
                 });
         }
         return defer.promise;
+    },
+    
+    getStationsStats: function () {
+        return stationsStats;
     },
     
     selectStation: function (stationKey) {
@@ -491,11 +507,9 @@ module.exports = {
     },
 
     forgetCurrentUser: function(){
-        currentUser = {
-            email : '',
-            premiumState : '',
-            premiumExpiresAt : 0
-        };
+        currentUser.email = '';
+        currentUser.premiumState = '';
+        currentUser.premiumExpiresAt = 0;
         premiumUser = false;
         bauerCookies = [];
         return currentUser;

@@ -18,8 +18,8 @@
       "saveButton": {
         "label": "TRANSLATE.COMMON.LOGIN",
         "data": [
-          "bauerradio_username",
-          "bauerradio_password"
+          "username",
+          "password"
         ]
       },
       "content": [
@@ -32,7 +32,7 @@
           "hidden":false
         },
         {
-          "id": "bauerradio_username",
+          "id": "username",
           "type": "text",
           "element": "input",
           "doc": "TRANSLATE.BAUERRADIO.USERNAME_DOC",
@@ -41,7 +41,7 @@
           "hidden":false
         },
         {
-          "id": "bauerradio_password",
+          "id": "password",
           "type": "password",
           "element": "input",
           "doc": "TRANSLATE.BAUERRADIO.PASSWORD_DOC",
@@ -54,7 +54,7 @@
           "element": "button",
           "label": "TRANSLATE.BAUERRADIO.RESET_PASSWORD",
           "description": "TRANSLATE.BAUERRADIO.RESET_PASSWORD_DESCR",
-          "onClick": {"type":"openUrl", "url":"http://www.qobuz.com/store-router/pages/volumio"},
+          "onClick": {"type":"openUrl", "url":"https://planetradio.co.uk/"},
           "hidden":true
         }
       ]
@@ -77,10 +77,24 @@
         },
 		"content": [
 			{
+			  "id":"stationsTotal",
+			  "type": "text",
+			  "element": "output",
+			  "label": "Number of stations: ",
+			  "value": "0"
+			},
+			{
+			  "id":"brandsTotal",
+			  "type": "text",
+			  "element": "output",
+			  "label": "Number of brands: ",
+			  "value": "0"
+			},
+			{
 			  "id":"stationsStatus",
 			  "type": "text",
 			  "element": "output",
-			  "label": "Last station refresh:",
+			  "label": "Last station refresh: ",
 			  "value": "0"
 			}
 		]

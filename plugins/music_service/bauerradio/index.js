@@ -615,7 +615,12 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 else status += ' using mpd status info.'
             }
             else status = 'Now playing not being monitored :-(';
+            let stationsStats = bRadio.getStationsStats();
+//            status += ' (' + stationsStats.total + ' stations, ' + stationsStats.brands + ' brands, last updated ' + stationsStats.updated + ')';
             uiconf.sections[1].description=status;  
+            uiconf.sections[1].content[0].label = 'Number of stations: ' + stationsStats.total;
+            uiconf.sections[1].content[1].label = 'Number of brands:   ' + stationsStats.brands;
+            uiconf.sections[1].content[2].label = 'Last list refresh:  ' + new Date(stationsStats.updated).toLocaleString('en-GB', { dateStyle : "short", timeStyle : "short"});
             
             // Debug section
             uiconf.sections[2].content[0].value = self.debug;
@@ -634,14 +639,14 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
     var self=this;
     var defer=libQ.defer();
 
-    bRadio.loginToBauerRadio(settings['bauerradio_username'], settings['bauerradio_password'])
+    bRadio.loginToBauerRadio(settings['username'], settings['password'])
 //        .then(() => self.registerIPAddress())
 //        .then(() => self.addToBrowseSources())
         .then(()=>{
-            this.userEmail = settings['bauerradio_username'];
+            this.userEmail = settings['username'];
             this.isLoggedIn = true;
-            this.config.set('username', settings['bauerradio_username']);
-            this.config.set('password',settings['bauerradio_password']);
+            this.config.set('username', settings['username']);
+            this.config.set('password',settings['password']);
 
             var config = self.getUIConfig();
             config.then(function(conf) {
@@ -649,6 +654,7 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
             });
 
             self.commandRouter.pushToastMessage('success', self.getI18n('COMMON.LOGGED_IN'));
+            self.rescanStations();
             defer.resolve({});
         })
         .fail(()=>{
@@ -698,7 +704,7 @@ ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
     var self=this;
     var defer=libQ.defer();
 
-    self.logoutFromBauerRadio(settings['BauerRadio_username'], settings['BauerRadio_password'])
+    self.logoutFromBauerRadio(settings['username'], settings['password'])
         //.then(() => self.commandRouter.volumioRemoveToBrowseSources('BauerRadio.fm'))
         .then(()=>{
             var config = self.getUIConfig();
@@ -707,6 +713,7 @@ ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
             });
 
             self.commandRouter.pushToastMessage('success', self.getI18n('COMMON.LOGGED_OUT'));
+            self.rescanStations();
             defer.resolve({});
         })
         .fail(()=>{
@@ -723,7 +730,7 @@ ControllerBauerRadio.prototype.logoutFromBauerRadio=function(username, password)
     this.config.set('password', "");
     this.isLoggedIn = false;
     this.userEmail = '';
-    return bRadio.forgetCurrentUser();
+    return libQ.resolve(bRadio.forgetCurrentUser());
 };
 
 ControllerBauerRadio.prototype.isLoggedIn = function () {
