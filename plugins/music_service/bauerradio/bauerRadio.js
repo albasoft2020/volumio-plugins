@@ -15,7 +15,7 @@ const stationsStats = {
     premium : 0,
     brands : 0,
     updated : 0
-}
+};
 
 let premiumUser = false;
 let preferACC = true;
@@ -105,6 +105,17 @@ module.exports = {
     },
     
     getStationsStats: function () {
+        if (stationsStats.total != stations.size) {  // station stats are out of date...
+            stationsStats.total = stations.size;
+            stationsStats.brands = brands.size;
+            stationsStats.updated = Date.now();
+            
+            let premStations = 0;
+            for (var station in stations) {
+                if (station.premiumOnlyStation) premStations++;
+            }
+            stationsStats.premium = premStations;
+        }
         return stationsStats;
     },
     

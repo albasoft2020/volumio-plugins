@@ -607,7 +607,7 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
                 uiconf.sections[0].saveButton.label=self.getI18n("COMMON.LOGIN");
                 uiconf.sections[0].onSave.method="saveAccountCredentials";
             }
-            // Status section
+            // Status section (uiconf.sections[1])
             let status = '';
             if (self.timer) {
                 status = 'Monitoring currently playing station';
@@ -619,10 +619,15 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
 //            status += ' (' + stationsStats.total + ' stations, ' + stationsStats.brands + ' brands, last updated ' + stationsStats.updated + ')';
             uiconf.sections[1].description=status;  
             uiconf.sections[1].content[0].label = 'Number of stations: ' + stationsStats.total;
-            uiconf.sections[1].content[1].label = 'Number of brands:   ' + stationsStats.brands;
-            uiconf.sections[1].content[2].label = 'Last list refresh:  ' + new Date(stationsStats.updated).toLocaleString('en-GB', { dateStyle : "short", timeStyle : "short"});
+            if (stationsStats.premium) {
+                uiconf.sections[1].content[1].label = 'Of Which Premium Only: ' + stationsStats.premium;
+                uiconf.sections[1].content[1].hidden=false;
+            }
+            else uiconf.sections[1].content[1].hidden=true;
+            uiconf.sections[1].content[2].label = 'Number of brands:   ' + stationsStats.brands;
+            uiconf.sections[1].content[3].label = 'Last list refresh:  ' + new Date(stationsStats.updated).toLocaleString('en-GB', { dateStyle : "short", timeStyle : "short"});
             
-            // Debug section
+            // Debug section (uiconf.sections[2])
             uiconf.sections[2].content[0].value = self.debug;
             defer.resolve(uiconf);
         })

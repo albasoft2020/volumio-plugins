@@ -73,6 +73,7 @@
 	    "saveButton": {
 			"label": "Refresh Station list",
 			"data": [
+				"stationsStatus"
 			]
         },
 		"content": [
@@ -81,6 +82,13 @@
 			  "type": "text",
 			  "element": "output",
 			  "label": "Number of stations: ",
+			  "value": "0"
+			},
+			{
+			  "id":"stationsPremium",
+			  "type": "text",
+			  "element": "output",
+			  "label": "included premium stations: ",
 			  "value": "0"
 			},
 			{
@@ -95,7 +103,7 @@
 			  "type": "text",
 			  "element": "output",
 			  "label": "Last station refresh: ",
-			  "value": "0"
+			  "value": "1"
 			}
 		]
 	},
