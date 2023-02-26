@@ -49,7 +49,7 @@ module.exports = {
 
         var defer=libQ.defer();
         
-        if (!refresh && (stations.size> 0)) {
+        if (!refresh && (brands.size > 0) && (stations.size > 0)) {
             defer.resolve(stations);
             console.log('Returned existing map');
         }
@@ -420,10 +420,6 @@ module.exports = {
         else {uid = id.uid; defer.resolve(id);}
         
         return defer.promise;
-    },
-    
-    setPremium: function(premium) {
-        return premiumUser = premium;
     },
     
     loginToBauerRadio: function(username, password) {

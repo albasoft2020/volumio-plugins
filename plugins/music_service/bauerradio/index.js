@@ -228,7 +228,7 @@ ControllerBauerRadio.prototype.onStop = function () {
 ControllerBauerRadio.prototype.addToBrowseSources = function () {
     var self = this;
 
-    var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.svg'};
+    var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.png'};
     if (self.debug > 2) self.logger.info('[BauerRadio] Adding browse source with: ' + JSON.stringify(data));
     return self.commandRouter.volumioAddToBrowseSources(data);
 }
@@ -270,7 +270,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     groupItems.push({
         "type": "item-no-menu",
         "title": 'Brands',
-        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.svg',
+        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.png',
         "uri": 'BauerRadio://brands'
     });
 
