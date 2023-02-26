@@ -12,6 +12,7 @@ var bRadio = require('./bauerRadio');  // BauerRadio specific code
 var tokenExpirationTime;
 
 const nowPlayingRefresh = 10000;  // time in ms
+const npInterval = nowPlayingRefresh + 'm';
 // Settings for splitting composite titles (as used for many webradio streams)
 const compositeTitle =
         {
@@ -30,24 +31,26 @@ module.exports = ControllerBauerRadio;
 function ControllerBauerRadio(context) {
 	var self=this;
 
-    self.context = context;
-    self.commandRouter = this.context.coreCommand;
-    self.logger = this.context.logger;
-    self.configManager = this.context.configManager;
-    self.serviceName = 'bauerradio';
+    this.context = context;
+    this.commandRouter = this.context.coreCommand;
+    this.logger = this.context.logger;
+    this.configManager = this.context.configManager;
+    this.serviceName = 'bauerradio';
     
-//    self.updateService = 'mpd';
-    self.updateService = 'bauerradio';
-    self.currentStation;
+//    this.updateService = 'mpd';
+    this.updateService = 'bauerradio';
+    this.currentStation;
     
-    self.debug = 0;  // define debug level
+    this.debug = 0;  // define debug level
     
-    self.userEmail = '';
-    self.isLoggedIn = false;
+    this.userEmail = '';
+    this.isLoggedIn = false;
     
-    self.previousSong = '';
-    self.currentSong = '';
-    self.state = {artist: '', title: ''};
+    this.npTimer = new NanoTimer();
+    
+    this.previousSong = '';
+    this.currentSong = '';
+    this.state = {artist: '', title: '', status: 'stop'};
 }
 
 ControllerBauerRadio.prototype.getConfigurationFiles = function () {
@@ -515,7 +518,7 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
                 .then(() => { 
                     // Maybe stop pretending to be 'mpd' and just admit who is in control...
                     self.commandRouter.stateMachine.setConsumeUpdateService(self.serviceName);
-                    setTimeout(self.setMetadata.bind(self), 2000, 'start'); 
+                    setTimeout(self.startNowPlayingTimer.bind(self), 2000, 'start'); 
                     defer.resolve();
                 }) 
                 .fail(function (e) {
@@ -609,15 +612,15 @@ ControllerBauerRadio.prototype.getUIConfig = function () {
             }
             // Status section (uiconf.sections[1])
             let status = '';
-            if (self.timer) {
+            if (self.state.status === 'play') {
                 status = 'Monitoring currently playing station';
                 if (bRadio.realTimeNowPlaying()) status += ' using realtime Now Playing URL.'
                 else status += ' using mpd status info.'
             }
-            else status = 'Now playing not being monitored :-(';
-            let stationsStats = bRadio.getStationsStats();
-//            status += ' (' + stationsStats.total + ' stations, ' + stationsStats.brands + ' brands, last updated ' + stationsStats.updated + ')';
-            uiconf.sections[1].description=status;  
+            else status = 'Not playing right now.';
+            uiconf.sections[1].description=status;
+            
+            let stationsStats = bRadio.getStationsStats();  
             uiconf.sections[1].content[0].label = 'Number of stations: ' + stationsStats.total;
             if (stationsStats.premium) {
                 uiconf.sections[1].content[1].label = 'Of Which Premium Only: ' + stationsStats.premium;
@@ -653,13 +656,13 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
             this.config.set('username', settings['username']);
             this.config.set('password',settings['password']);
 
-            var config = self.getUIConfig();
-            config.then(function(conf) {
-                self.commandRouter.broadcastMessage('pushUiConfig', conf);
-            });
-
-            self.commandRouter.pushToastMessage('success', self.getI18n('COMMON.LOGGED_IN'));
-            self.rescanStations();
+//            self.commandRouter.pushToastMessage('success', self.getI18n('COMMON.LOGGED_IN'));
+            self.rescanStations(true);
+//            // update config page:
+//            let config = self.getUIConfig();
+//            config.then(function(conf) {
+//                self.commandRouter.broadcastMessage('pushUiConfig', conf);
+//            });
             defer.resolve({});
         })
         .fail(()=>{
@@ -674,7 +677,8 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
 * Update Debug Settings, changing the level of detailed logged
 * 0 : only errors logged; for higher numbers increasingly more detail is logged
  * @param {type} data
- * @returns {.libQ@call;defer.promise} */
+ * @returns {.libQ@call;defer.promise} 
+ */
  ControllerBauerRadio.prototype.updateDebugSettings = function (data)
 {
 	var self = this;
@@ -689,7 +693,7 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
 	return defer.promise;
 };
 
- ControllerBauerRadio.prototype.rescanStations = function ()
+ ControllerBauerRadio.prototype.rescanStations = function (ui)
 {
 	var self = this;
 	var defer=libQ.defer();
@@ -697,6 +701,13 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
     bRadio.getLiveStations(true)
            .then((stations) =>  {
                 self.commandRouter.pushToastMessage('success', "Live station list", "Successfully loaded " + stations.size + " stations.");
+                
+                if (ui) {
+                    let config = self.getUIConfig();
+                    config.then(function(conf) {
+                        self.commandRouter.broadcastMessage('pushUiConfig', conf);
+                    });
+                }
                 defer.resolve();
             })
             .fail(() => defer.reject());
@@ -924,35 +935,52 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
     let defer = libQ.defer();
     
     if (playState == 'stop') {
-        if (self.timer) {
-            self.logger.info('[BauerRadio] Stopping timer');
-            self.timer.clear();
-        }
-//        defer.resolve(self.pushSongState(self.currentStation, playState));
-        return libQ.resolve(self.pushSongState(self.currentStation, playState));
-    } else return self.getMetadata()
-    .then(function(metadata) {
-        self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
-        if (metadata){
-            if(metadata.unchanged) {
-                if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-                if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
-                return libQ.resolve();
-            }
-            else {
-                return libQ.resolve(self.pushSongState(metadata, playState))
-                .then(function () {
-                    if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-                    if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
-                });
-            }
-        };
-    })
-    .fail(() => {
-        if (self.debug > 0) self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-        if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
-        return libQ.resolve();
-    });
+//        if (self.timer) {
+//            self.logger.info('[BauerRadio] Stopping timer');
+//            self.timer.clear();
+//        }
+        this.npTimer.clearInterval();
+        defer.resolve(self.pushSongState(self.currentStation, playState));
+//        return libQ.resolve(self.pushSongState(self.currentStation, playState));
+    } 
+    else {
+        self.getMetadata()
+            .then((metadata) => {
+                self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
+                if (metadata){
+                    if(metadata.unchanged) {
+//                        if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+//                        if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
+                        return defer.resolve();
+                    }
+                    else {
+                        return defer.resolve(self.pushSongState(metadata, playState))
+//                        .then(function () {
+//                            if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+//                            if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
+//                        });
+                    }
+                };
+            })
+            .fail(() => {
+//                if (self.debug > 0) self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
+//                if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
+                defer.reject('Failed to retrieve metadata.');
+            });
+    }
+    return defer.promise;
+};
+
+
+ControllerBauerRadio.prototype.startNowPlayingTimer = function () {
+    let self = this;
+    let defer = libQ.defer();
+    
+    this.setMetadata('start')
+            .then(() => {
+                if (self.debug > 0) self.logger.info('[BauerRadio] Starting now playing timer with interval ' + nowPlayingRefresh/1000 + ' seconds.');
+                this.npTimer.setInterval(self.setMetadata.bind(self), ['play'], npInterval);
+            });
 };
 
 
