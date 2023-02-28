@@ -11,6 +11,7 @@ var bRadio = require('./bauerRadio');  // BauerRadio specific code
 
 var tokenExpirationTime;
 
+const bigTimeStamp = 4000000000000;
 const nowPlayingRefresh = 10000;  // time in ms
 const npInterval = nowPlayingRefresh + 'm';
 // Settings for splitting composite titles (as used for many webradio streams)
@@ -48,6 +49,7 @@ function ControllerBauerRadio(context) {
     
     this.npTimer = new NanoTimer();
     
+    this.songEndTime = bigTimeStamp;
     this.previousSong = '';
     this.currentSong = '';
     this.state = {artist: '', title: '', status: 'stop'};
@@ -816,7 +818,10 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     };
 
     if (status === 'start') prState.status = 'play';
-            
+    
+    if (metadata.duration) this.songEndTime = ts + (metadata.duration + 5) * 1000;
+    else this.songEndTime = bigTimeStamp;
+    
     //workaround to allow state to be pushed when not in a volatile state
     var vState = self.commandRouter.stateMachine.getState();
     var queueItem = self.commandRouter.stateMachine.playQueue.arrayQueue[vState.position];
@@ -833,7 +838,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
 
     self.logger.info('[BauerRadio] Current state: ' + vState.status + ', Queue position: ' + vState.position);
 
-    self.state = prState;
+    if (this.currentStation.title !== metadata.title) self.state = prState;
     
     //reset volumio internal timer
     self.commandRouter.stateMachine.currentSeek = seek;
@@ -862,14 +867,18 @@ ControllerBauerRadio.prototype.getMetadata = function () {
             bRadio.nowPlaying()
                 .then(song => {
                     if (!song.title) {
-                        self.logger.info('[BauerRadio] Empty realtime now playing response. Something is going wrong here');
-                        song = self.currentStation;
+                        this.logger.info('[BauerRadio] Empty realtime now playing response. Something is going wrong here');
+                        song = this.currentStation;
                     }
-                    if ((song.title == self.state.title) && (song.artist == self.state.artist)) {
-                        defer.resolve({unchanged: true});
+                    if ((song.title == this.state.title) && (song.artist == this.state.artist)) {
+                        if (Date.now() > this.songEndTime) {
+                            this.logger.info('[BauerRadio] Song should have ended by now: '+ this.commandRouter.stateMachine.currentSeek/1000);
+                            defer.resolve(this.currentStation);
+                        }
+                        else defer.resolve({unchanged: true});
                     } else {
                         // get extra data directly from mpd
-                        self.mpdPlugin.getState()
+                        this.mpdPlugin.getState()
                             .then(mState => {
                                 song.samplerate = mState.samplerate;
                                 song.bitdepth = mState.bitdepth;
