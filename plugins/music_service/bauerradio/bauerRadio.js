@@ -25,6 +25,7 @@ let currentNowPlaying = '';
 let bauerCookies = [];
 
 const currentStation = {
+    "ID": '',
     "title": '',
     "premium" : '',
     "nowPlaying":'',
@@ -64,7 +65,6 @@ module.exports = {
                 .then((response) => {
                     if (response &&
                         response.status === 200) {
-    //                    const stations = new Map();
                         stationsStats.updated = Date.now();
                         stationsStats.premium = 0;
                         for (var station in response.body) {
@@ -87,12 +87,10 @@ module.exports = {
                                     "name": brandID,
                                     "albumart": response.body[station]['stationListenBarLogo'],
                                     "stations": [response.body[station]['stationCode']]
-                                }
+                                };
                             }
-                            brands.set(brandID, brand)
+                            brands.set(brandID, brand);
                         }
-        //                console.log(response.body[28]);
-        //                console.log(stations.get('jaz'))  
                         stationsStats.total = stations.size;
                         stationsStats.brands = brands.size;
                         defer.resolve(stations);
@@ -105,7 +103,7 @@ module.exports = {
     },
     
     getStationsStats: function () {
-        if (stationsStats.total != stations.size) {  // station stats are out of date...
+        if (stationsStats.total !== stations.size) {  // station stats are out of date...
             stationsStats.total = stations.size;
             stationsStats.brands = brands.size;
             stationsStats.updated = Date.now();
@@ -127,6 +125,7 @@ module.exports = {
 
         this.setNowPlayingURL(stream.url, stationKey);
 
+        currentStation.ID = stationKey;
         currentStation.title = stationDetails.name;
         currentStation.premium = stream.premium;
         currentStation.albumart = stationDetails.albumart;
@@ -141,11 +140,11 @@ module.exports = {
     },
 
     // Get a details for selected station
-    getStationDetails: function (key) {
+    getStationDetails: function (key, forceUpdate) {
 
         var defer=libQ.defer();
 
-        if (stations.has(key) && stations.get(key)["lastDetailsUpdate"] > 0) {
+        if (stations.has(key) && (stations.get(key)["lastDetailsUpdate"] > 0) && !forceUpdate) {
             console.log('No need to fetch details');
             defer.resolve(stations.get(key));
         } else {
@@ -157,16 +156,19 @@ module.exports = {
                         let stationDetails = {
                             "lastDetailsUpdate": Date.now(),
                             "name": response.body['stationName'],
-                            "albumart": response.body['stationListenBarLogo'],
+                            "albumart": response.body['stationSquareLogo'],  // maybe better use 'stationSquareLogo' instead of 'stationListenBarLogo'?
+                            "DADIChannelId": response.body['stationDADIChannelId'],
                             "brand": response.body['stationBrandCode'],
                             "premiumOnlyStation": response.body['premiumOnlyStation'],
                             "premiumEnabled": response.body['premiumEnabled'],
                             "streamACC": response.body['stationAACStream'],
                             "streamMP3": response.body['stationMP3Stream'],
                             "streamPremiumACC": "",
-                            "streamPremiumMP3": ""
+                            "streamPremiumMP3": "",
+                            "episodeTitle": response.body['stationOnAir']['episodeTitle'],
+                            "episodeDescription": response.body['stationOnAir']['episodeDescription'],
+                            "episodeEnd": Date.parse(response.body['stationOnAir']['episodeStart']) + response.body['stationOnAir']['episodeDuration']*1000
                         };
-//                        console.log(response.body['premiumEnabled']);
                         if (response.body['premiumEnabled'] || response.body['premiumOnlyStation']){
                             response.body['stationStreams'].forEach((stream) => {
     //                            console.log(stream);
@@ -181,9 +183,37 @@ module.exports = {
                             });
                         } 
                         stations.set(key, stationDetails);
-        //                console.log(response.body[28]);
-        //                console.log(stations.get('jaz'))  
                         defer.resolve(stationDetails);
+                    } else {
+                        defer.reject();
+                    }
+                });
+        };
+        return defer.promise;
+    },
+
+        // Get a details for selected station
+    getStationNowPlayingInfo: function (key) {
+
+        let defer=libQ.defer();
+        
+        if (!key) key = currentStation.ID;
+        if (stations.has(key)) {
+            console.log('Fetching details. Station in map: ', stations.has(key));
+            unirest
+                .get(`https://listenapi.planetradio.co.uk/api9.2/initweb/${key}`)
+                .then((response) => {
+                    if (response && response.status === 200) {
+                        let stationNowPlaying = {
+                            "nowPlayingTrack": response.body['stationNowPlaying']['nowPlayingTrack'],
+                            "nowPlayingArtist": response.body['stationNowPlaying']['nowPlayingArtist'],
+                            "nowPlayingImage": response.body['stationNowPlaying']['nowPlayingImage'],
+                            "nowPlayingDuration": response.body['stationNowPlaying']['nowPlayingDuration'],
+                            "episodeTitle": response.body['stationOnAir']['episodeTitle'],
+                            "episodeDescription": response.body['stationOnAir']['episodeDescription'],
+                            "episodeEnd": Date.parse(response.body['stationOnAir']['episodeStart']) + response.body['stationOnAir']['episodeDuration']*1000
+                        }; 
+                        defer.resolve(stationNowPlaying);
                     } else {
                         defer.reject();
                     }
@@ -215,8 +245,6 @@ module.exports = {
                                 brands.set(brandID, updatedBrand);
                             }
                         });
-        //                console.log(response.body[28]);
-        //                console.log(stations.get('jaz'))  
                         lastBrandsUpdate = Date.now();
                         defer.resolve(brands);
                     } else {

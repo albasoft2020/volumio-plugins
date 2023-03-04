@@ -266,6 +266,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
         "type": "item-no-menu",
         "title": 'All Live Radio Stations',
         "albumart": '',
+        "icon": 'fa fa-radio',
         "uri": 'BauerRadio://stations'
     });
     
@@ -838,7 +839,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
 
     self.logger.info('[BauerRadio] Current state: ' + vState.status + ', Queue position: ' + vState.position);
 
-    if (this.currentStation.title !== metadata.title) self.state = prState;
+    if ((status === 'play') && (!metadata.noUpdate)) self.state = prState;
     
     //reset volumio internal timer
     self.commandRouter.stateMachine.currentSeek = seek;
@@ -867,13 +868,32 @@ ControllerBauerRadio.prototype.getMetadata = function () {
             bRadio.nowPlaying()
                 .then(song => {
                     if (!song.title) {
-                        this.logger.info('[BauerRadio] Empty realtime now playing response. Something is going wrong here');
+                        this.logger.warn('[BauerRadio] Empty realtime now playing response. Something is going wrong here');
                         song = this.currentStation;
                     }
                     if ((song.title == this.state.title) && (song.artist == this.state.artist)) {
                         if (Date.now() > this.songEndTime) {
                             this.logger.info('[BauerRadio] Song should have ended by now: '+ this.commandRouter.stateMachine.currentSeek/1000);
-                            defer.resolve(this.currentStation);
+                            bRadio.getStationNowPlayingInfo()
+                                .then(np => {
+                                    console.log(JSON.stringify(np))
+                                    let stationEpisode = { noUpdate : true };
+                                    if ((np.nowPlayingTrack && np.nowPlayingTrack !== this.state.title) && (np.nowPlayingArtist !== this.state.artist)) {
+                                        // some shows do not seem to have now playing data on the premium channel, but only on the regular
+                                        // version. In this case try to grab the now Playing info that has been returned by the station:
+                                        stationEpisode.title = np.nowPlayingTrack;
+                                        stationEpisode.artist = np.nowPlayingArtist;
+                                        stationEpisode.albumart = np.nowPlayingImage;
+                                        stationEpisode.duration = np.nowPlayingDuration;                            
+                                    }
+                                    else {
+                                        // no now playing info available. Display the station name together with the show title:
+                                        stationEpisode.title = this.currentStation.title + ': ' + np.episodeTitle;
+                                        stationEpisode.albumart = this.currentStation.albumart;
+                                        stationEpisode.duration = (np.episodeEnd-Date.now())/1000;
+                                    }
+                                    defer.resolve(stationEpisode);
+                            });
                         }
                         else defer.resolve({unchanged: true});
                     } else {
