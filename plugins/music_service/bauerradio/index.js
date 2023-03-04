@@ -1,10 +1,10 @@
 'use strict';
-var unirest=require('unirest');
+//var unirest=require('unirest');
 var libQ=require('kew');
-var ip = require('public-ip');
+//var ip = require('public-ip');
 var fs=require('fs-extra');
-var cron = require('node-schedule');
-var moment=require('moment');
+//var cron = require('node-schedule');
+//var moment=require('moment');
 var NanoTimer = require('nanotimer');
 
 var bRadio = require('./bauerRadio');  // BauerRadio specific code
@@ -21,6 +21,7 @@ const compositeTitle =
             indexOfArtist: 1,
             indexOfTitle: 0
         };
+        
 /**
  * CONSTRUCTOR
  * 
@@ -80,8 +81,6 @@ ControllerBauerRadio.prototype.onStart = function () {
 
     this.loadI18n();
     this.startupLogin();
-//    this.startRefreshCron();
-
     defer.resolve('');
 
     return defer.promise;
@@ -154,10 +153,6 @@ ControllerBauerRadio.prototype.startupLogin = function () {
             this.userEmail = this.config.get('username');
             this.isLoggedIn = true;
         });
-//        .then(()=>self.registerIPAddress())
-//        .then(()=>self.addToBrowseSources())
-    // HACK
-//    bRadio.setPremium(this.config.get("password", false));
     self.addToBrowseSources();
 };
 
@@ -186,35 +181,6 @@ ControllerBauerRadio.prototype.loginToBauerRadio=function(username, password) {
     return bRadio.loginToBauerRadio(username, password);
 };
 
-//ControllerBauerRadio.prototype.registerIPAddress=function() {
-//    var self=this
-//    var defer=libQ.defer()
-//    
-//    ip.v4().then((address)=>{
-//        var cookieJar=unirest.jar()
-//        cookieJar.add('PHPSESSID='+self.sessionId,'https://users.hotelradio.fm/api/user/updateip')
-//
-//        var request=unirest.post('https://users.hotelradio.fm/api/user/updateip')
-//            .jar(cookieJar)
-//            .send('id='+self.userId)
-//            .send('ip='+address)
-//            .then((response)=>{
-//                if(response && 
-//                    response.status === 200 &&
-//                    'user' in response.body)
-//                {
-//                    defer.resolve()
-//                } else {
-//                    defer.reject()
-//                }   
-//            })
-//    }).catch((error)=>{
-//        defer.reject()
-//    })
-//
-//    return defer.promise
-//}
-
 ControllerBauerRadio.prototype.onStop = function () {
     var self = this;
     var defer=libQ.defer();
@@ -233,7 +199,7 @@ ControllerBauerRadio.prototype.addToBrowseSources = function () {
     var data = {name: 'BauerRadio.fm', uri: 'BauerRadio://',plugin_type:'music_service',plugin_name:'bauerradio',albumart:'/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.png'};
     if (self.debug > 2) self.logger.info('[BauerRadio] Adding browse source with: ' + JSON.stringify(data));
     return self.commandRouter.volumioAddToBrowseSources(data);
-}
+};
 
 ControllerBauerRadio.prototype.handleBrowseUri = function (curUri) {
     
@@ -265,8 +231,8 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     groupItems.push({
         "type": "item-no-menu",
         "title": 'All Live Radio Stations',
-        "albumart": '',
-        "icon": 'fa fa-radio',
+//        "albumart": '',
+        "icon": 'fa-microphone',
         "uri": 'BauerRadio://stations'
     });
     
@@ -289,7 +255,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
                     "items": groupItems
                 }]
         }
-    }
+    };
     self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
     // fetch list of stations (if needed)
     bRadio.getLiveStations()
@@ -305,16 +271,12 @@ ControllerBauerRadio.prototype.handleStationBrowseUri=function(curUri) {
     var defer=libQ.defer();
     var self=this;
 
-//    var brandID=curUri.split('/')[2];
-//    console.log(curUri, brandID);
-    self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri);
+    if (self.debug > 0) self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri);
     
     var stationItems = [];
     
     bRadio.getLiveStations()
         .then((response) => {
-//            console.log('Live stations found: ', response.size);
-
             response.forEach((value, key) => { 
                 stationItems.push({
                     "type": "webradio",
@@ -340,7 +302,7 @@ ControllerBauerRadio.prototype.handleStationBrowseUri=function(curUri) {
             };
             self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
 
-            self.logger.info('[BauerRadio] Listed live stations');
+            if (self.debug > 2) self.logger.info('[BauerRadio] Listed live stations');
             defer.resolve(browseResponse);
 
         });
@@ -352,26 +314,21 @@ ControllerBauerRadio.prototype.handleBrandBrowseUri=function(curUri) {
     var defer=libQ.defer();
     var self=this;
 
-    self.logger.info('[BauerRadio] handleBrandBrowseUri called with: ' + curUri);
+    if (self.debug > 0) self.logger.info('[BauerRadio] handleBrandBrowseUri called with: ' + curUri);
     
     var brandItems = [];
     
     bRadio.getBrands()
         .then((response) => {
-//            console.log('Live stations found: ', response.size);
-
             response.forEach((value, key) => { 
                 brandItems.push({
                     "type": "item-no-menu",
-//                    "uri": 'BauerRadio://brands'
                     "title": value['name'],
                     "albumart": value['albumart'],
                     "uri": `${curUri}/${key}`,
 //                    "service":"bauerradio"
                 });
             });
-            
-//            console.log(stationItems[28]);
             
             var browseResponse={
                 "navigation": {
@@ -401,7 +358,7 @@ ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
     var self=this;
 
     let brandID=curUri.split('/').pop(); // get last element of uri
-    self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri + ', i.e. brandID: ' + brandID);
+    if (self.debug > 0) self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri + ', i.e. brandID: ' + brandID);
     
     var stationItems = [];
     
@@ -432,7 +389,7 @@ ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
             };
             self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
 
-            self.logger.info('[BauerRadio] Listed live stations');
+            if (self.debug > 2) self.logger.info('[BauerRadio] Listed live stations');
             defer.resolve(browseResponse);
 
         });
@@ -444,7 +401,7 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
     var self=this;
 
     const stationID= curUri.split('/').pop();
-    self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', Ch: ' + stationID);
+    if (self.debug > 0) self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', Ch: ' + stationID);
 
     let explodeResp =  {
                 "uri": curUri,
@@ -468,7 +425,6 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     var defer=libQ.defer();
     var self=this;
 
-//    var brandID=curUri.split('/')[2];
     let stationID = curUri.split('/').pop();
 
     let explodeResp = {
@@ -483,9 +439,9 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
                     .then(station => {
                         self.currentStation = station;
                         explodeResp["uri"] = station.uri;
-                        self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
+                        if (self.debug > 0) self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
                         defer.resolve(explodeResp);
-                    })
+                    });
         });
     return defer.promise;
 };
@@ -540,7 +496,8 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 
 /**
 * Stop playback and set metadata back to station defaults
-* @returns {unresolved} */
+* @returns {unresolved} 
+*/
  ControllerBauerRadio.prototype.stop = function() {
     var self = this;
     self.logger.info('[BauerRadio] Stopped playback');
@@ -551,7 +508,8 @@ ControllerBauerRadio.prototype.clearAddPlayTrack = function(track) {
 /**
 * Needed as volumio also seems to expect a pause method whenever duration of a stream is not 0
 * Use this to also stop the stream similar to the stop method.
- * @returns {unresolved} */
+* @returns {unresolved} 
+*/
 ControllerBauerRadio.prototype.pause = function() {
     var self = this;
     self.logger.info('[BauerRadio] Can\'t pause, so stopping playback');
@@ -651,8 +609,6 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
     var defer=libQ.defer();
 
     bRadio.loginToBauerRadio(settings['username'], settings['password'])
-//        .then(() => self.registerIPAddress())
-//        .then(() => self.addToBrowseSources())
         .then(()=>{
             this.userEmail = settings['username'];
             this.isLoggedIn = true;
@@ -714,7 +670,6 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
                 defer.resolve();
             })
             .fail(() => defer.reject());
-
 	return defer.promise;
 };
  
@@ -724,9 +679,8 @@ ControllerBauerRadio.prototype.clearAccountCredentials = function (settings) {
     var defer=libQ.defer();
 
     self.logoutFromBauerRadio(settings['username'], settings['password'])
-        //.then(() => self.commandRouter.volumioRemoveToBrowseSources('BauerRadio.fm'))
         .then(()=>{
-            var config = self.getUIConfig();
+            let config = self.getUIConfig();
             config.then(function(conf) {
                 self.commandRouter.broadcastMessage('pushUiConfig', conf);
             });
@@ -756,30 +710,6 @@ ControllerBauerRadio.prototype.isLoggedIn = function () {
     return this.config.get("loggedin", false);
 };
 
-//ControllerBauerRadio.prototype.startRefreshCron=function() {
-//    var self=this;
-//
-//    this.stopRefreshCron();
-//
-//    // Refreshing login every 12 hours
-//    var m=moment();
-//    var cronString=m.second()+' '+m.minute()+' '+m.hour()+','+(m.hour()+12)%24+' * * *';
-//    this.accessTokenRefreshCron=cron.scheduleJob(cronString, () => {
-//        self.startupLogin();
-//    });
-//
-//    this.logger.info('AccessToken refresher cron started for Bauer Radio');
-//};
-
-//ControllerBauerRadio.prototype.stopRefreshCron=function() {
-//    if(this.accessTokenRefreshCron)
-//    {
-//        this.accessTokenRefreshCron.cancel()
-//        this.accessTokenRefreshCron=undefined
-//    }
-//
-//    this.logger.info('Stopping AccessToken refresher cron for Bauer	Radio');
-//};
     
 ControllerBauerRadio.prototype.pushState = function (state) {
     
@@ -803,7 +733,6 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     
     var prState = {
         status: status,
-//        service: self.serviceName,
         service: this.updateService,
 //        type: 'webradio',
         trackType: self.currentStation.trackType,
@@ -813,7 +742,6 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
         artist: metadata.artist,
         album: metadata.album,
         streaming: true,
-//        disableUiControls: true,
         duration: metadata.duration,
         seek: seek
     };
@@ -837,7 +765,7 @@ ControllerBauerRadio.prototype.pushSongState = function (metadata, status) {
     if (metadata.bitdepth) { prState.bitdepth = metadata.bitdepth; queueItem.bitdepth = metadata.bitdepth; }
     if (metadata.channels) { prState.channels = metadata.channels; queueItem.channels = metadata.channels; }
 
-    self.logger.info('[BauerRadio] Current state: ' + vState.status + ', Queue position: ' + vState.position);
+    if (self.debug > 2) self.logger.info('[BauerRadio] Current state: ' + vState.status + ', Queue position: ' + vState.position);
 
     if ((status === 'play') && (!metadata.noUpdate)) self.state = prState;
     
@@ -873,7 +801,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                     }
                     if ((song.title == this.state.title) && (song.artist == this.state.artist)) {
                         if (Date.now() > this.songEndTime) {
-                            this.logger.info('[BauerRadio] Song should have ended by now: '+ this.commandRouter.stateMachine.currentSeek/1000);
+                            if (self.debug > 0) this.logger.info('[BauerRadio] Song should have ended by now: '+ this.commandRouter.stateMachine.currentSeek/1000);
                             bRadio.getStationNowPlayingInfo()
                                 .then(np => {
                                     console.log(JSON.stringify(np))
@@ -918,15 +846,14 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                     } else {
                         self.logger.info('[BauerRadio] mpd state ' + JSON.stringify(mState));
                         if (mState.title.startsWith('https://listenapi.planetradio.co.uk')){
-                                self.logger.info('[BauerRadio] Try to retrieve metadata');
+                                if (self.debug > 0) self.logger.info('[BauerRadio] Try to retrieve metadata');
                                 bRadio.getEventDetails(mState.title)
                                     .then(song => {
                                         self.currentSong = mState.title;
                                         song.samplerate = mState.samplerate;
                                         song.bitdepth = mState.bitdepth;
-                                        song.channels = mState.channels,
-                                        self.logger.info('[BauerRadio] metadata: ' + JSON.stringify(song));
-                                        self.logger.info('[BauerRadio] Pass on metadata');
+                                        song.channels = mState.channels;
+                                        if (self.debug > 0) self.logger.info('[BauerRadio] metadata: ' + JSON.stringify(song));
                                         defer.resolve(song);
                                     });
                         } else {
@@ -939,10 +866,10 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                                         let info = mState.title.split(compositeTitle.separator);
                                         mState.artist = info[compositeTitle.indexOfArtist].trim();
                                         mState.title = info[compositeTitle.indexOfTitle].trim();
-                                        self.logger.info('[Bauerradio] Split composite title.');
+                                        if (self.debug > 0) self.logger.info('[Bauerradio] Split composite title.');
                                    }
                                     catch (ex) {
-                                       self.logger.info('[Bauerradio] Current track does not have sufficient metadata: Missing artist. Failed to split composite title ' + mState.title);
+                                       if (self.debug > 0) self.logger.info('[Bauerradio] Current track does not have sufficient metadata: Missing artist. Failed to split composite title ' + mState.title);
                                    }
                                 } else {
                                     mState.albumart = self.currentStation.albumart;
@@ -963,37 +890,24 @@ ControllerBauerRadio.prototype.setMetadata = function (playState) {
     let self = this;
     let defer = libQ.defer();
     
-    if (playState == 'stop') {
-//        if (self.timer) {
-//            self.logger.info('[BauerRadio] Stopping timer');
-//            self.timer.clear();
-//        }
+    if (playState === 'stop') {
         this.npTimer.clearInterval();
         defer.resolve(self.pushSongState(self.currentStation, playState));
-//        return libQ.resolve(self.pushSongState(self.currentStation, playState));
     } 
     else {
         self.getMetadata()
             .then((metadata) => {
-                self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
+                if (self.debug > 1) self.logger.info('[BauerRadio] Metadata: ' + JSON.stringify(metadata));
                 if (metadata){
                     if(metadata.unchanged) {
-//                        if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-//                        if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                         return defer.resolve();
                     }
                     else {
-                        return defer.resolve(self.pushSongState(metadata, playState))
-//                        .then(function () {
-//                            if (self.debug > 3) self.logger.info('[BauerRadio] setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-//                            if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
-//                        });
+                        return defer.resolve(self.pushSongState(metadata, playState));
                     }
                 };
             })
             .fail(() => {
-//                if (self.debug > 0) self.logger.info('[BauerRadio] Failed. Setting new timer with duration of ' + nowPlayingRefresh/1000 + ' seconds.');
-//                if (playState != 'stop') self.timer = new PRTimer(self.setMetadata.bind(self), ['play'], nowPlayingRefresh);
                 defer.reject('Failed to retrieve metadata.');
             });
     }
