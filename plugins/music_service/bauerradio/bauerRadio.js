@@ -5,7 +5,8 @@ var libQ=require('kew');
 
 const premiumStreamBase = 'https://stream.on.revma.com';
 const NowPlayingPremiumUrl = new URL('https://stream.on.revma.com/api/user/command/now_playing');
-const NowPlayingUrl = 'https://listenapi.planetradio.co.uk/api9.2/nowplaying';
+const apiBase = 'https://listenapi.planetradio.co.uk/api9.2/';
+const NowPlayingUrl = apiBase + 'nowplaying';
 
 const stations = new Map();
 const brands = new Map();
@@ -24,7 +25,8 @@ let realTimeNowPlaying = '';
 let currentNowPlaying = '';
 let bauerCookies = [];
 
-const currentStation = {
+const currentStream = {
+    "type":'',
     "ID": '',
     "title": '',
     "premium" : '',
@@ -59,21 +61,23 @@ module.exports = {
             if (premiumUser) premium = "?premium=1"
             stations.clear();
             brands.clear();
-            console.log('Requesting info through web. Include premium stations: ' + premiumUser);
+//            console.log('Requesting info through web. Include premium stations: ' + premiumUser);
+            const stationsURL = apiBase + 'stations/gb' + premium;
             unirest
-                .get(`https://listenapi.planetradio.co.uk/api9.2/stations/gb${premium}`)
+                .get(stationsURL)
                 .then((response) => {
                     if (response &&
                         response.status === 200) {
                         stationsStats.updated = Date.now();
                         stationsStats.premium = 0;
                         for (var station in response.body) {
-            //                    console.log(station);
+//                            console.log(station);
                             let brandID = response.body[station]['stationBrandCode'];
                             stations.set(response.body[station]['stationCode'], {
                                 "lastDetailsUpdate": -1,
                                 "name": response.body[station]['stationName'],
-                                "albumart": response.body[station]['stationListenBarLogo'],
+                                "albumart": response.body[station]['stationSquareLogo'],
+                                "DADIChannelId": response.body[station]['stationDADIChannelId'],
                                 "brand": brandID,
                                 "premiumOnlyStation": response.body[station]['premiumOnlyStation']
                             });
@@ -124,19 +128,36 @@ module.exports = {
         let stream = this.getStreamUrl(stationDetails);
 
         this.setNowPlayingURL(stream.url, stationKey);
-
-        currentStation.ID = stationKey;
-        currentStation.title = stationDetails.name;
-        currentStation.premium = stream.premium;
-        currentStation.albumart = stationDetails.albumart;
-        currentStation.uri = stream.url;
-        currentStation.trackType =stream.type;
         
-        return libQ.resolve(currentStation);
+        currentStream.typeof = 'station';
+        currentStream.ID = stationKey;
+        currentStream.title = stationDetails.name;
+        currentStream.premium = stream.premium;
+        currentStream.albumart = stationDetails.albumart;
+        currentStream.uri = stream.url;
+        currentStream.trackType =stream.type;
+        
+        return libQ.resolve(currentStream);
+    },
+
+   selectListenAgainEpisode: function (episode) {
+        
+        realTimeNowPlaying = '';
+        currentNowPlaying = '';
+        
+        currentStream.typeof = 'listenagain';
+        currentStream.ID = episode['episodeid'];
+        currentStream.title = episode['title'];
+        currentStream.premium = !episode['is_premium_only'];
+        currentStream.albumart = episode['imageurl_square'];
+        currentStream.uri = episode['mediaurl'];
+        currentStream.trackType = 'm4a';
+        
+        return libQ.resolve(currentStream);
     },
     
     getActiveStationDetails: function () {
-        return currentStation;
+        return currentStream;
     },
 
     // Get a details for selected station
@@ -149,8 +170,9 @@ module.exports = {
             defer.resolve(stations.get(key));
         } else {
             console.log('Fetching details. Station in map: ', stations.has(key));
+            const stationURL = apiBase + 'initweb/' + key;
             unirest
-                .get(`https://listenapi.planetradio.co.uk/api9.2/initweb/${key}`)
+                .get(stationURL)
                 .then((response) => {
                     if (response && response.status === 200) {
                         let stationDetails = {
@@ -192,16 +214,17 @@ module.exports = {
         return defer.promise;
     },
 
-        // Get a details for selected station
+    // Get a details for selected station
     getStationNowPlayingInfo: function (key) {
 
         let defer=libQ.defer();
         
-        if (!key) key = currentStation.ID;
+        if (!key) key = currentStream.ID;
         if (stations.has(key)) {
             console.log('Fetching details. Station in map: ', stations.has(key));
+            const stationURL = apiBase + 'initweb/' + key;
             unirest
-                .get(`https://listenapi.planetradio.co.uk/api9.2/initweb/${key}`)
+                .get(stationURL)
                 .then((response) => {
                     if (response && response.status === 200) {
                         let stationNowPlaying = {
@@ -222,6 +245,29 @@ module.exports = {
         return defer.promise;
     },
     
+    // Get list of listen again episodes
+    getListenAgainEpisodes: function (key) {
+
+        let defer=libQ.defer();
+        
+        if (!key) key = currentStream.ID;
+        if (stations.has(key)) {    
+            let premium = "";
+            if (premiumUser) premium = "?premium_user=1";
+            const listenAgainURL = apiBase + 'listenagaindadi/' + stations.get(key)['DADIChannelId'] + premium; 
+//            console.log('Fetching listen again using: ', listenAgainURL);
+            unirest
+                .get(listenAgainURL)
+                .then((response) => {
+                    if (response) {
+                        console.log('Received data: ' + Object.keys(response.body));
+                        defer.resolve(response.body);
+                    } 
+                });
+        } else defer.reject();
+        return defer.promise;
+    },
+    
     // Get list of available brands
     getBrands: function () {
 
@@ -232,8 +278,9 @@ module.exports = {
             defer.resolve(brands);
         } else {
             console.log('Fetching details. Brands in map: ', brands.size);
+            const brandURL = apiBase + 'brands/';
             unirest
-                .get(`https://listenapi.planetradio.co.uk/api9.2/brands`)
+                .get(brandURL)
                 .then((response) => {
                     if (response && response.status === 200) {
                         response.body.forEach((brand) => {
@@ -356,7 +403,7 @@ module.exports = {
                             'timestamp' : Math.floor(new Date(eventDetails.eventStart).getTime() / 1000)
                         };
                         if (eventDetails.eventImageUrl === 'https://media.bauerradio.com/image/upload/tracks/0.jpg') 
-                            song.albumart = currentStation.albumart;
+                            song.albumart = currentStream.albumart;
                         defer.resolve(song);
                     } else {
                         defer.resolve(eventDetails);

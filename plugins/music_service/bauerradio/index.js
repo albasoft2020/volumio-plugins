@@ -217,22 +217,27 @@ ControllerBauerRadio.prototype.handleBrowseUri = function (curUri) {
                 }
                 else return this.handleBrandsStationsBrowseUri(curUri);       
             }
-//            else return thishandleBrandBrowseUri(curUri);
+            else if (curUri.startsWith('BauerRadio://listenagain')) {
+                if (curUri == 'BauerRadio://listenagain') {
+                    return this.handleListenAgainBrowseUri(curUri);
+                }
+                else return this.handleListenAgainBrowseUri(curUri); 
+            }
         }
     }
 };
 
 ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
-    var defer=libQ.defer();
-    var self=this;
+    let defer=libQ.defer();
+    let self=this;
 
-    var groupItems = [];
+    let groupItems = [];
     
     groupItems.push({
         "type": "item-no-menu",
         "title": 'All Live Radio Stations',
 //        "albumart": '',
-        "icon": 'fa-microphone',
+        "icon": 'fa fa-radio',
         "uri": 'BauerRadio://stations'
     });
     
@@ -243,7 +248,15 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
         "uri": 'BauerRadio://brands'
     });
 
-    var browseResponse={
+    groupItems.push({
+        "type": "item-no-menu",
+        "title": 'Listen again',
+//        "albumart": '',
+        "icon": 'fa fa-microphone',
+        "uri": 'BauerRadio://listenagain'
+    });
+    
+    let browseResponse={
         "navigation": {
             "lists": [
                 {
@@ -352,6 +365,84 @@ ControllerBauerRadio.prototype.handleBrandBrowseUri=function(curUri) {
     return defer.promise;
 };
 
+ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
+
+    var defer=libQ.defer();
+    var self=this;
+
+    if (self.debug > 0) self.logger.info('[BauerRadio] handleListenAgainBrowseUri called with: ' + curUri);
+    
+    if (curUri === 'BauerRadio://listenagain') { // top level of listen again: refresh list of available episodes and display them by date
+        var listenDates = [];
+    
+        bRadio.getListenAgainEpisodes('jaz')
+            .then((response) => {
+                    this.listenAgainEpisodes = response;
+                    for (var date in response) {
+                    listenDates.push({
+                        "type": "item-no-menu",
+                        "title": date,
+    //                    "albumart": value['albumart'],
+                        "icon": "fa calendar",
+                        "uri": `${curUri}/${date}`
+    //                    "service":"bauerradio"
+                    });
+                }
+
+                var browseResponse={
+                    "navigation": {
+                        "lists": [
+                            {
+                                "type": "title",
+                                "title": "TRANSLATE.BAUERRADIO.BRANDS",
+                                "availableListViews": [
+                                    "grid", "list"
+                                ],
+                                "items": listenDates
+                            }]
+                    }
+                };
+                self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
+
+                self.logger.info('[BauerRadio] Listed available listen again dates');
+                defer.resolve(browseResponse);
+
+            });
+        } else { // episode level of listen again: display individual episodes 
+            let episodes = [];
+            let date=curUri.split('/').pop(); 
+            for (var show in this.listenAgainEpisodes[date]) {
+                    episodes.push({
+                        "type": "webradio",
+                        "title": this.listenAgainEpisodes[date][show]['title'],
+                        "albumart": this.listenAgainEpisodes[date][show]['imageurl_square'],
+//                        "icon": "fa calendar",
+                        "uri": `${curUri}/${show}`,
+                        "service":"bauerradio"
+                    });
+                }
+
+                var browseResponse={
+                    "navigation": {
+                        "lists": [
+                            {
+                                "type": "title",
+                                "title": date,
+                                "availableListViews": [
+                                    "grid", "list"
+                                ],
+                                "items": episodes
+                            }]
+                    }
+                };
+                self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
+
+                self.logger.info('[BauerRadio] Listed brands');
+                defer.resolve(browseResponse);
+        }
+    return defer.promise;
+};
+
 ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
 
     var defer=libQ.defer();
@@ -399,10 +490,7 @@ ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
 ControllerBauerRadio.prototype.explodeUri = function(curUri) {
     var defer=libQ.defer();
     var self=this;
-
-    const stationID= curUri.split('/').pop();
-    if (self.debug > 0) self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', Ch: ' + stationID);
-
+    
     let explodeResp =  {
                 "uri": curUri,
                 "service": "bauerradio",
@@ -412,12 +500,24 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
                 "type": "track",
                 "albumart": ""
             };
-    bRadio.getStationDetails(stationID)
-        .then((response) => {
-            explodeResp["name"] = response["name"];
-            explodeResp["albumart"] = response["albumart"];
-            defer.resolve([explodeResp]);
-        });
+            
+    let parts = curUri.split('/');
+    if (parts[2] == 'listenagain') {
+        if (self.debug > 0) self.logger.info('[BauerRadio] explodeUri called with: ' + curUri);
+        explodeResp["name"] = this.listenAgainEpisodes[parts[3]][parts[4]]['title'];
+        explodeResp["albumart"] = this.listenAgainEpisodes[parts[3]][parts[4]]['imageurl_square'];
+        defer.resolve([explodeResp]);
+    } else {
+        const stationID= curUri.split('/').pop();
+        if (self.debug > 0) self.logger.info('[BauerRadio] explodeUri called with: ' + curUri + ', Ch: ' + stationID);
+
+        bRadio.getStationDetails(stationID)
+            .then((response) => {
+                explodeResp["name"] = response["name"];
+                explodeResp["albumart"] = response["albumart"];
+                defer.resolve([explodeResp]);
+            });
+    }
     return defer.promise;
 };
 
@@ -430,19 +530,33 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     let explodeResp = {
         "uri": ""
     };
-    bRadio.getStationDetails(stationID)
-        .then((response) => {
-//            explodeResp["name"] = response["name"];
-            explodeResp["title"] = response["name"];
-            explodeResp["albumart"] = response["albumart"];
-            bRadio.selectStation(stationID)
-                    .then(station => {
-                        self.currentStation = station;
-                        explodeResp["uri"] = station.uri;
-                        if (self.debug > 0) self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
-                        defer.resolve(explodeResp);
-                    });
-        });
+    
+    let parts = curUri.split('/');
+    if (parts[2] == 'listenagain') { // listen again episode
+        bRadio.selectListenAgainEpisode(this.listenAgainEpisodes[parts[3]][parts[4]])
+                .then(response => {
+                    self.currentStation = response;
+                    explodeResp["title"] = response["title"];
+                    explodeResp["albumart"] = response["albumart"];
+                    explodeResp["uri"] = response["uri"];
+                    if (self.debug > 0) self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
+                    defer.resolve(explodeResp);
+                });
+    } else {  // live station
+        bRadio.getStationDetails(stationID)
+            .then((response) => {
+    //            explodeResp["name"] = response["name"];
+                explodeResp["title"] = response["name"];
+                explodeResp["albumart"] = response["albumart"];
+                bRadio.selectStation(stationID)
+                        .then(station => {
+                            self.currentStation = station;
+                            explodeResp["uri"] = station.uri;
+                            if (self.debug > 0) self.logger.info('[BauerRadio] getStreamUrl returned: ' + explodeResp["uri"]);
+                            defer.resolve(explodeResp);
+                        });
+            });
+    }
     return defer.promise;
 };
 
@@ -816,7 +930,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                                     }
                                     else {
                                         // no now playing info available. Display the station name together with the show title:
-                                        stationEpisode.title = this.currentStation.title + ': ' + np.episodeTitle;
+                                        stationEpisode.title = this.currentStation.title + ' (' + np.episodeTitle + ')';
                                         stationEpisode.albumart = this.currentStation.albumart;
                                         stationEpisode.duration = (np.episodeEnd-Date.now())/1000;
                                     }
