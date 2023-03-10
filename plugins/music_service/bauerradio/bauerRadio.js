@@ -76,10 +76,11 @@ module.exports = {
                             stations.set(response.body[station]['stationCode'], {
                                 "lastDetailsUpdate": -1,
                                 "name": response.body[station]['stationName'],
-                                "albumart": response.body[station]['stationSquareLogo'],
+                                "albumart": response.body[station]['stationListenBarLogo'],  // maybe better use 'stationSquareLogo' instead of 'stationListenBarLogo'?
                                 "DADIChannelId": response.body[station]['stationDADIChannelId'],
                                 "brand": brandID,
-                                "premiumOnlyStation": response.body[station]['premiumOnlyStation']
+                                "premiumOnlyStation": response.body[station]['premiumOnlyStation'],
+                                "hasSchedule": response.body[station]['hasSchedule']
                             });
                             if (response.body[station]['premiumOnlyStation']) stationsStats.premium++;
                             var brand;
@@ -182,6 +183,7 @@ module.exports = {
                             "DADIChannelId": response.body['stationDADIChannelId'],
                             "brand": response.body['stationBrandCode'],
                             "premiumOnlyStation": response.body['premiumOnlyStation'],
+                            "hasSchedule": response.body['hasSchedule'],
                             "premiumEnabled": response.body['premiumEnabled'],
                             "streamACC": response.body['stationAACStream'],
                             "streamMP3": response.body['stationMP3Stream'],
@@ -260,7 +262,7 @@ module.exports = {
                 .get(listenAgainURL)
                 .then((response) => {
                     if (response) {
-                        console.log('Received data: ' + Object.keys(response.body));
+//                        console.log('Received data: ' + Object.keys(response.body));
                         defer.resolve(response.body);
                     } 
                 });

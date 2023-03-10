@@ -8,11 +8,14 @@
     "LOGGED_IN":"Logged in to PlanetRadio",
     "LOGGED_OUT":"Logged out from PlanetRadio",
     "ERROR_LOGGING_IN":"An error occurred trying to log in into PlanetRadio",
-    "ERROR_LOGGING_OUT":"An error occurred trying to log out from PlanetRadio"
+    "ERROR_LOGGING_OUT":"An error occurred trying to log out from PlanetRadio",
+	"SEARCH":"Search"
   },
   "BAUERRADIO":{
     "BRANDS":"PlanetRadio Brands",
     "STATIONS":"Live radio stations",
+	"LISTENAGAINSTATIONS":"Listen again stations",
+	"LISTENAGAIN":"Listen again episodes",
     "SECTION_ACCOUNT":"PlanetRadio account credentials",
     "ACCOUNT_LOGIN_DESC":"Login in to your free PlanetRadio account can give you additional features. There are also some ad-break free premium subscription channels available.",
     "USERNAME_DOC":"PlanetRadio username",

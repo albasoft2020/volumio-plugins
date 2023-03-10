@@ -235,30 +235,50 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
     
     groupItems.push({
         "type": "item-no-menu",
-        "title": 'All Live Radio Stations',
-//        "albumart": '',
-        "icon": 'fa fa-radio',
-        "uri": 'BauerRadio://stations'
+        "title": 'Stations by Brand',
+        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.png',
+        "uri": 'BauerRadio://brands'
     });
     
     groupItems.push({
         "type": "item-no-menu",
-        "title": 'Brands',
-        "albumart": '/albumart?sectionimage=music_service/bauerradio/icons/PlanetRadio.png',
-        "uri": 'BauerRadio://brands'
-    });
-
-    groupItems.push({
-        "type": "item-no-menu",
-        "title": 'Listen again',
+        "title": 'All Live Radio Stations',
 //        "albumart": '',
-        "icon": 'fa fa-microphone',
-        "uri": 'BauerRadio://listenagain'
+        "icon": 'fa fa-music',
+        "uri": 'BauerRadio://stations'
     });
+    
+//    groupItems.push({
+//        "type": "item-no-menu",
+//        "title": 'Listen again',
+////        "albumart": '',
+//        "icon": 'fa fa-repeat',
+//        "uri": 'BauerRadio://listenagain'
+//    });
     
     let browseResponse={
         "navigation": {
             "lists": [
+                {
+                    "type": "title",
+                    "title": "Favourites",
+                    "availableListViews": [
+                        "grid", "list"
+                    ],
+                    "items": [{
+                        "type": "webradio",
+                        "title": 'Jazz FM',
+//                        "albumart": value['albumart'],
+                        "uri": 'BauerRadio://stations/jaz',
+                        "service":"bauerradio"
+                        },{
+                        "type": "item-no-menu",
+                        "title": 'Listen again Jazz FM',
+                //        "albumart": '',
+                        "icon": 'fa fa-repeat',
+                        "uri": 'BauerRadio://listenagain/jaz'
+                    }]
+                },
                 {
                     "type": "title",
                     "title": "TRANSLATE.BAUERRADIO.BRANDS",
@@ -266,7 +286,22 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
                         "grid", "list"
                     ],
                     "items": groupItems
-                }]
+                },
+                {
+                    "type": "title",
+                    "title": "Catch up",
+                    "availableListViews": [
+                        "grid", "list"
+                    ],
+                    "items": [{
+                        "type": "item-no-menu",
+                        "title": 'Listen again',
+                //        "albumart": '',
+                        "icon": 'fa fa-repeat',
+                        "uri": 'BauerRadio://listenagain'
+                    }]
+                }
+            ]
         }
     };
     self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
@@ -372,10 +407,46 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
 
     if (self.debug > 0) self.logger.info('[BauerRadio] handleListenAgainBrowseUri called with: ' + curUri);
     
-    if (curUri === 'BauerRadio://listenagain') { // top level of listen again: refresh list of available episodes and display them by date
-        var listenDates = [];
+    var browseResponse= {};
     
-        bRadio.getListenAgainEpisodes('jaz')
+    if (curUri === 'BauerRadio://listenagain') { // top level of listen again: refresh list of available episodes and display them by date
+        var stationItems = [];
+        bRadio.getLiveStations()
+        .then((response) => {
+            response.forEach((value, key) => { 
+                if (value['hasSchedule'] === 1) {
+                    stationItems.push({
+                        "type": "item-no-menu",
+                        "title": value['name'],
+                        "albumart": value['albumart'],
+                        "uri": `${curUri}/${key}`
+                    });
+                }
+            });
+            browseResponse={
+                "navigation": {
+                    "lists": [
+                        {
+                            "type": "title",
+                            "title": "TRANSLATE.BAUERRADIO.LISTENAGAINSTATIONS",
+                            "availableListViews": [
+                                "grid", "list"
+                            ],
+                            "items": stationItems
+                        }]
+                }
+            };
+            self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
+
+            if (self.debug > 2) self.logger.info('[BauerRadio] Listed stations with listen again shows');
+            defer.resolve(browseResponse);
+
+        });
+    }
+    else if (curUri.split('/').length === 4) {
+        var listenDates = [];
+        let stationID=curUri.split('/').pop();
+        bRadio.getListenAgainEpisodes(stationID)
             .then((response) => {
                     this.listenAgainEpisodes = response;
                     for (var date in response) {
@@ -383,18 +454,19 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
                         "type": "item-no-menu",
                         "title": date,
     //                    "albumart": value['albumart'],
-                        "icon": "fa calendar",
+//                        "icon": "fa fa-folder-open-o",
+                        "icon": "fa fa-calendar",
                         "uri": `${curUri}/${date}`
     //                    "service":"bauerradio"
                     });
                 }
 
-                var browseResponse={
+                browseResponse={
                     "navigation": {
                         "lists": [
                             {
                                 "type": "title",
-                                "title": "TRANSLATE.BAUERRADIO.BRANDS",
+                                "title": "TRANSLATE.BAUERRADIO.LISTENAGAIN",
                                 "availableListViews": [
                                     "grid", "list"
                                 ],
@@ -422,7 +494,7 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
                     });
                 }
 
-                var browseResponse={
+                browseResponse={
                     "navigation": {
                         "lists": [
                             {
@@ -504,8 +576,8 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
     let parts = curUri.split('/');
     if (parts[2] == 'listenagain') {
         if (self.debug > 0) self.logger.info('[BauerRadio] explodeUri called with: ' + curUri);
-        explodeResp["name"] = this.listenAgainEpisodes[parts[3]][parts[4]]['title'];
-        explodeResp["albumart"] = this.listenAgainEpisodes[parts[3]][parts[4]]['imageurl_square'];
+        explodeResp["name"] = this.listenAgainEpisodes[parts[4]][parts[5]]['title'];
+        explodeResp["albumart"] = this.listenAgainEpisodes[parts[4]][parts[5]]['imageurl_square'];
         defer.resolve([explodeResp]);
     } else {
         const stationID= curUri.split('/').pop();
@@ -533,7 +605,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     
     let parts = curUri.split('/');
     if (parts[2] == 'listenagain') { // listen again episode
-        bRadio.selectListenAgainEpisode(this.listenAgainEpisodes[parts[3]][parts[4]])
+        bRadio.selectListenAgainEpisode(this.listenAgainEpisodes[parts[4]][parts[5]])
                 .then(response => {
                     self.currentStation = response;
                     explodeResp["title"] = response["title"];
