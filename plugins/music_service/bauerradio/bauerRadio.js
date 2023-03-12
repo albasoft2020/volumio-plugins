@@ -28,7 +28,10 @@ let bauerCookies = [];
 const currentStream = {
     "type":'',
     "ID": '',
+    "DADI": '',
     "title": '',
+    "name": '',
+    "starttime": 0,
     "premium" : '',
     "nowPlaying":'',
     "realtimeNP":'',
@@ -130,31 +133,47 @@ module.exports = {
 
         this.setNowPlayingURL(stream.url, stationKey);
         
-        currentStream.typeof = 'station';
+        currentStream.type = 'station';
         currentStream.ID = stationKey;
+        currentStream.DADI = stationDetails.DADIChannelId;
         currentStream.title = stationDetails.name;
+        currentStream.name = stationDetails.name;
         currentStream.premium = stream.premium;
-        currentStream.albumart = stationDetails.albumart;
+        currentStream.albumart = stationDetails.albumartLarge || stationDetails.albumart;
         currentStream.uri = stream.url;
         currentStream.trackType =stream.type;
+        currentStream.starttime = Date.now();
         
         return libQ.resolve(currentStream);
     },
 
-   selectListenAgainEpisode: function (episode) {
+   selectListenAgainEpisode: function (episode, stationID) {
         
         realTimeNowPlaying = '';
         currentNowPlaying = '';
         
-        currentStream.typeof = 'listenagain';
+        currentStream.type = 'listenagain';
         currentStream.ID = episode['episodeid'];
-        currentStream.title = episode['title'];
+//        currentStream.DADI = stationKey;
+        currentStream.title = episode['title'] + ' (' +  new Date(episode['starttime']).toLocaleDateString('en-GB', { dateStyle : "long"});
+//        currentStream.name = stationDetails.name;
         currentStream.premium = !episode['is_premium_only'];
         currentStream.albumart = episode['imageurl_square'];
         currentStream.uri = episode['mediaurl'];
         currentStream.trackType = 'm4a';
-        
-        return libQ.resolve(currentStream);
+        currentStream.starttime = Date.now();      
+        if (stations.has(stationID)) {
+            currentStream.DADI = stations.get(stationID)['DADIChannelId'];
+            currentStream.name = stations.get(stationID)['name'];
+                        currentStream.title += ' on ' + currentStream.name + ')';
+        } else {
+            currentStream.DADI = '';
+            currentStream.name = '';
+            currentStream.title += ')';
+
+        }
+
+       return libQ.resolve(currentStream);
     },
     
     getActiveStationDetails: function () {
@@ -178,8 +197,9 @@ module.exports = {
                     if (response && response.status === 200) {
                         let stationDetails = {
                             "lastDetailsUpdate": Date.now(),
-                            "name": response.body['stationName'],
-                            "albumart": response.body['stationSquareLogo'],  // maybe better use 'stationSquareLogo' instead of 'stationListenBarLogo'?
+                            "name": response.body['stationName'],                            
+                            "albumart": response.body['stationListenBarLogo'],
+                            "albumartLarge": response.body['stationSquareLogo'],  // maybe better use 'stationSquareLogo' instead of 'stationListenBarLogo'?
                             "DADIChannelId": response.body['stationDADIChannelId'],
                             "brand": response.body['stationBrandCode'],
                             "premiumOnlyStation": response.body['premiumOnlyStation'],
@@ -244,6 +264,48 @@ module.exports = {
                     }
                 });
         };
+        return defer.promise;
+    },
+    
+    // Get a details for selected station
+    getPlaylist: function (episode) {
+
+        let defer=libQ.defer();
+        
+        let key = episode.episodeid;
+        console.log('Fetching playlist: ', key);
+        const playlistURL = apiBase + 'playlist/?ScheduleId=' + key;
+        let defaultPL = {
+                "title": episode.title,
+                "artist": '',
+                "artwork": episode.imageurl_square,
+                "duration": episode.duration,
+                "starttime": 0
+            };
+            
+        unirest
+            .get(playlistURL)
+            .then((response) => {
+                if (response && response.status === 200) {
+                    let playlist = [];
+                    let episodeStart = Date.parse(episode.starttime);
+                    for (var track in response.body){
+                        if (track === 0) episodeStart = Date.parse(response.body[track]['nowPlayingTime']) - 5000; 
+                        playlist.push({
+                            "title": response.body[track]['nowPlayingTrack'],
+                            "artist": response.body[track]['nowPlayingArtist'],
+                            "artwork": response.body[track]['nowPlayingImage'],
+                            "duration": response.body[track]['nowPlayingDuration'],
+                            "starttime": (Date.parse(response.body[track]['nowPlayingTime']) - episodeStart)
+                        });
+                    }
+                    playlist.push(defaultPL);  // add episode info at the end
+                    defer.resolve(playlist);
+                } else {
+                    defer.reject([defaultPL]);
+                }
+            });
+
         return defer.promise;
     },
     

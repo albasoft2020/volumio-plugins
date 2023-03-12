@@ -407,7 +407,9 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
 
     if (self.debug > 0) self.logger.info('[BauerRadio] handleListenAgainBrowseUri called with: ' + curUri);
     
-    var browseResponse= {};
+    let browseResponse = {};
+    let sectionTitle = "TRANSLATE.BAUERRADIO.LISTENAGAIN";
+    self.commandRouter.translateKeys(sectionTitle, self.i18nStrings, self.i18nStringsDefaults);
     
     if (curUri === 'BauerRadio://listenagain') { // top level of listen again: refresh list of available episodes and display them by date
         var stationItems = [];
@@ -428,7 +430,7 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
                     "lists": [
                         {
                             "type": "title",
-                            "title": "TRANSLATE.BAUERRADIO.LISTENAGAINSTATIONS",
+                            "title": "TRANSLATE.BAUERRADIO.LISTENAGAIN",
                             "availableListViews": [
                                 "grid", "list"
                             ],
@@ -449,10 +451,11 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
         bRadio.getListenAgainEpisodes(stationID)
             .then((response) => {
                     this.listenAgainEpisodes = response;
+                    this.listenAgainStation = stationID;
                     for (var date in response) {
                     listenDates.push({
                         "type": "item-no-menu",
-                        "title": date,
+                        "title": new Date(date).toLocaleDateString('en-GB', { weekday: "short", month: "short", year:"numeric", day: "numeric"}),
     //                    "albumart": value['albumart'],
 //                        "icon": "fa fa-folder-open-o",
                         "icon": "fa fa-calendar",
@@ -475,10 +478,13 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
                     }
                 };
                 self.commandRouter.translateKeys(browseResponse, self.i18nStrings, self.i18nStringsDefaults);
-
-                self.logger.info('[BauerRadio] Listed available listen again dates');
-                defer.resolve(browseResponse);
-
+                
+                bRadio.getStationDetails(stationID)
+                        .then(station => { 
+                            browseResponse.navigation.lists[0]['title'] += ' for ' + station.name;
+                            self.logger.info('[BauerRadio] Listed available listen again dates');
+                            defer.resolve(browseResponse);
+                        });
             });
         } else { // episode level of listen again: display individual episodes 
             let episodes = [];
@@ -499,7 +505,7 @@ ControllerBauerRadio.prototype.handleListenAgainBrowseUri=function(curUri) {
                         "lists": [
                             {
                                 "type": "title",
-                                "title": date,
+                                "title": new Date(date).toLocaleDateString('en-GB', { weekday: "short", month: "short", year:"numeric", day: "numeric"}),
                                 "availableListViews": [
                                     "grid", "list"
                                 ],
@@ -586,7 +592,7 @@ ControllerBauerRadio.prototype.explodeUri = function(curUri) {
         bRadio.getStationDetails(stationID)
             .then((response) => {
                 explodeResp["name"] = response["name"];
-                explodeResp["albumart"] = response["albumart"];
+                explodeResp["albumart"] = response["albumartLarge"] || response["albumart"];
                 defer.resolve([explodeResp]);
             });
     }
@@ -605,9 +611,14 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     
     let parts = curUri.split('/');
     if (parts[2] == 'listenagain') { // listen again episode
-        bRadio.selectListenAgainEpisode(this.listenAgainEpisodes[parts[4]][parts[5]])
+        bRadio.selectListenAgainEpisode(this.listenAgainEpisodes[parts[4]][parts[5]], this.listenAgainStation)
                 .then(response => {
                     self.currentStation = response;
+                    bRadio.getPlaylist(this.listenAgainEpisodes[parts[4]][parts[5]])
+                            .then(pl => {
+                                self.playlist = pl;
+                                if (self.debug > 0) self.logger.info('[BauerRadio] Playlist items: ' + pl.length);                        
+                    });
                     explodeResp["title"] = response["title"];
                     explodeResp["albumart"] = response["albumart"];
                     explodeResp["uri"] = response["uri"];
@@ -619,7 +630,7 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
             .then((response) => {
     //            explodeResp["name"] = response["name"];
                 explodeResp["title"] = response["name"];
-                explodeResp["albumart"] = response["albumart"];
+                explodeResp["albumart"] = response["albumartLarge"] || response["albumart"];
                 bRadio.selectStation(stationID)
                         .then(station => {
                             self.currentStation = station;
@@ -1023,6 +1034,28 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                             .fail(() => defer.resolve(song));
                     }
                 });
+        } else if (this.currentStation.type === 'listenagain') {
+            let stationEpisode = { 
+                noUpdate : false,
+                title : this.currentStation.title,
+                albumart : this.currentStation.albumart
+            };
+            
+            if (this.playlist) {
+                let i = 0;
+                let playtime = Date.now() - this.currentStation.starttime;
+                while (this.playlist[i]['starttime'] < playtime) i++;
+                if (i > 0) {
+                    i--;                
+                    if ((this.playlist[i].title === this.state.title) && (this.playlist[i].artist === this.state.artist)) {
+                        stationEpisode = {unchanged: true};
+                    } else {
+                        stationEpisode = this.playlist[i];
+                    }    
+                }
+            } 
+            defer.resolve(stationEpisode);
+            
         } else {
             self.mpdPlugin.getState()
 //            self.commandRouter.stateMachine.getState()
