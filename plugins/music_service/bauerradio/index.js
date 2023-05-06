@@ -240,13 +240,13 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
         "uri": 'BauerRadio://brands'
     });
     
-    groupItems.push({
-        "type": "item-no-menu",
-        "title": 'All Live Radio Stations',
-//        "albumart": '',
-        "icon": 'fa fa-music',
-        "uri": 'BauerRadio://stations'
-    });
+//    groupItems.push({
+//        "type": "item-no-menu",
+//        "title": 'All Live Radio Stations',
+////        "albumart": '',
+//        "icon": 'fa fa-music',
+//        "uri": 'BauerRadio://stations'
+//    });
     
 //    groupItems.push({
 //        "type": "item-no-menu",
@@ -271,13 +271,7 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
 //                        "albumart": value['albumart'],
                         "uri": 'BauerRadio://stations/jaz',
                         "service":"bauerradio"
-                        },{
-                        "type": "item-no-menu",
-                        "title": 'Listen again Jazz FM',
-                //        "albumart": '',
-                        "icon": 'fa fa-repeat',
-                        "uri": 'BauerRadio://listenagain/jaz'
-                    }]
+                        }]
                 },
                 {
                     "type": "title",
@@ -289,11 +283,18 @@ ControllerBauerRadio.prototype.handleRootBrowseUri=function() {
                 },
                 {
                     "type": "title",
-                    "title": "Catch up",
+                    "title": "Aphabetical station lists",
                     "availableListViews": [
                         "grid", "list"
                     ],
-                    "items": [{
+                    "items": [{          
+                        "type": "item-no-menu",
+                        "title": 'Live Radio Stations',
+                //        "albumart": '',
+                        "icon": 'fa fa-music',
+                        "uri": 'BauerRadio://stations'
+                    },
+                    {  
                         "type": "item-no-menu",
                         "title": 'Listen again',
                 //        "albumart": '',
@@ -529,7 +530,8 @@ ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
     let brandID=curUri.split('/').pop(); // get last element of uri
     if (self.debug > 0) self.logger.info('[BauerRadio] handleStationBrowseUri called with: ' + curUri + ', i.e. brandID: ' + brandID);
     
-    var stationItems = [];
+    let stationItems = [];
+    let catchUpItems = [];
     
     bRadio.getBrandStations(brandID)
         .then((response) => {
@@ -541,6 +543,14 @@ ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
                     "uri": `${curUri}/${key}`,
                     "service":"bauerradio"
                 });
+                if (value['hasSchedule'] === 1) {
+                    catchUpItems.push({
+                        "type": "item-no-menu",
+                        "title": value['name'],
+                        "albumart": value['albumart'],
+                        "uri": `BauerRadio://listenagain/${key}`
+                    });
+                }
             });
             
             var browseResponse={
@@ -553,6 +563,14 @@ ControllerBauerRadio.prototype.handleBrandsStationsBrowseUri=function(curUri) {
                                 "grid", "list"
                             ],
                             "items": stationItems
+                        },
+                        {
+                            "type": "title",
+                            "title": "Listen again episodes",
+                            "availableListViews": [
+                                "grid", "list"
+                            ],
+                            "items": catchUpItems
                         }]
                 }
             };
@@ -1053,6 +1071,7 @@ ControllerBauerRadio.prototype.getMetadata = function () {
                         stationEpisode = this.playlist[i];
                     }    
                 }
+                if (self.debug > 2) self.logger.info('[BauerRadio] playlist item: ' + i + ', playtime: ' + playtime + ' track start: ' + this.playlist[i]['starttime']);
             } 
             defer.resolve(stationEpisode);
             

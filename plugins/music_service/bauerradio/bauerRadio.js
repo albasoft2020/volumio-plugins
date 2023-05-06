@@ -290,7 +290,7 @@ module.exports = {
                     let playlist = [];
                     let episodeStart = Date.parse(episode.starttime);
                     for (var track in response.body){
-                        if (track === 0) episodeStart = Date.parse(response.body[track]['nowPlayingTime']) - 5000; 
+                        if (track == 0) episodeStart = Date.parse(response.body[track]['nowPlayingTime']) - 5000; 
                         playlist.push({
                             "title": response.body[track]['nowPlayingTrack'],
                             "artist": response.body[track]['nowPlayingArtist'],
@@ -381,7 +381,7 @@ module.exports = {
                             stationList.set(station, stations.get(station));
                         });
                     }
-//                    console.log(stationList.size);
+//                   console.log(stationList.size);
                     defer.resolve(stationList);
                 })
                 .fail((e) => {defer.reject(e); } );
