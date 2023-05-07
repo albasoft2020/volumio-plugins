@@ -65,7 +65,7 @@ module.exports = {
             stations.clear();
             brands.clear();
 //            console.log('Requesting info through web. Include premium stations: ' + premiumUser);
-            const stationsURL = apiBase + 'stations/gb' + premium;
+            const stationsURL = apiBase + 'stationlist/gb' + premium;
             unirest
                 .get(stationsURL)
                 .then((response) => {
@@ -90,11 +90,13 @@ module.exports = {
                             if (brands.has(brandID)){
                                 brand = brands.get(brandID);
                                 brand["stations"].push(response.body[station]['stationCode']);
+                                brand["withOrder"].push({station: response.body[station]['stationCode'], order: response.body[station]['brandOrder']});
                             } else {
                                 brand =  {
                                     "name": brandID,
                                     "albumart": response.body[station]['stationListenBarLogo'],
-                                    "stations": [response.body[station]['stationCode']]
+                                    "stations": [response.body[station]['stationCode']],
+                                    "withOrder": [{station: response.body[station]['stationCode'], order: response.body[station]['brandOrder']}]
                                 };
                             }
                             brands.set(brandID, brand);
@@ -351,6 +353,12 @@ module.exports = {
                             let brandID = brand["BrandCode"];
                             if (brands.has(brandID)) {
                                 let updatedBrand = brands.get(brandID);
+                                // Try to sort stations in order
+                                updatedBrand["withOrder"].sort((a, b) => { return a.order - b.order; });
+                                console.log('Brands stations: ', updatedBrand["withOrder"].length, updatedBrand.stations);
+                               updatedBrand.stations = [];
+                                updatedBrand["withOrder"].forEach((s) => updatedBrand.stations.push(s.station));
+                                console.log('  Sorted stations: ', updatedBrand.stations);
                                 updatedBrand["name"] = brand['BrandName'];
                                 updatedBrand["albumart"] = brand['BrandWhiteLogoImageUrl'];
                                 brands.set(brandID, updatedBrand);
