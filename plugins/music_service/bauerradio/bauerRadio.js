@@ -46,6 +46,8 @@ const currentUser = {
     premiumExpiresAt : 0
 };
 
+const debug = false;
+
 // ======================= START OF MODULE EXPORT
 module.exports = {
 // ======================= Tools (called from outside)
@@ -57,7 +59,7 @@ module.exports = {
         
         if (!refresh && (brands.size > 0) && (stations.size > 0)) {
             defer.resolve(stations);
-            console.log('Returned existing map');
+            if (debug) console.log('Returned existing map');
         }
         else {
             let premium = "";
@@ -188,10 +190,10 @@ module.exports = {
         var defer=libQ.defer();
 
         if (stations.has(key) && (stations.get(key)["lastDetailsUpdate"] > 0) && !forceUpdate) {
-            console.log('No need to fetch details');
+            if (debug) console.log('No need to fetch details');
             defer.resolve(stations.get(key));
         } else {
-            console.log('Fetching details. Station in map: ', stations.has(key));
+            if (debug) console.log('Fetching details. Station in map: ', stations.has(key));
             const stationURL = apiBase + 'initweb/' + key;
             unirest
                 .get(stationURL)
@@ -245,7 +247,7 @@ module.exports = {
         
         if (!key) key = currentStream.ID;
         if (stations.has(key)) {
-            console.log('Fetching details. Station in map: ', stations.has(key));
+            if (debug) console.log('Fetching details. Station in map: ', stations.has(key));
             const stationURL = apiBase + 'initweb/' + key;
             unirest
                 .get(stationURL)
@@ -275,7 +277,7 @@ module.exports = {
         let defer=libQ.defer();
         
         let key = episode.episodeid;
-        console.log('Fetching playlist: ', key);
+        if (debug) console.log('Fetching playlist: ', key);
         const playlistURL = apiBase + 'playlist/?ScheduleId=' + key;
         let defaultPL = {
                 "title": episode.title,
@@ -340,10 +342,10 @@ module.exports = {
         var defer=libQ.defer();
 
         if (lastBrandsUpdate > 0) {
-            console.log('No need to fetch brand details');
+            if (debug) console.log('No need to fetch brand details');
             defer.resolve(brands);
         } else {
-            console.log('Fetching details. Brands in map: ', brands.size);
+            if (debug) console.log('Fetching details. Brands in map: ', brands.size);
             const brandURL = apiBase + 'brands/';
             unirest
                 .get(brandURL)
@@ -355,10 +357,10 @@ module.exports = {
                                 let updatedBrand = brands.get(brandID);
                                 // Try to sort stations in order
                                 updatedBrand["withOrder"].sort((a, b) => { return a.order - b.order; });
-                                console.log('Brands stations: ', updatedBrand["withOrder"].length, updatedBrand.stations);
+                                if (debug) console.log('Brands stations: ', updatedBrand["withOrder"].length, updatedBrand.stations);
                                updatedBrand.stations = [];
                                 updatedBrand["withOrder"].forEach((s) => updatedBrand.stations.push(s.station));
-                                console.log('  Sorted stations: ', updatedBrand.stations);
+                                if (debug) console.log('  Sorted stations: ', updatedBrand.stations);
                                 updatedBrand["name"] = brand['BrandName'];
                                 updatedBrand["albumart"] = brand['BrandWhiteLogoImageUrl'];
                                 brands.set(brandID, updatedBrand);
@@ -437,7 +439,7 @@ module.exports = {
         
         if (streamUrl.startsWith(premiumStreamBase) && uid) {
             const url = new URL(streamUrl);
-            console.log('Stream ID: ', url.pathname.slice(1) , ' , Search: ' , url.search);
+            if (debug) console.log('Stream ID: ', url.pathname.slice(1) , ' , Search: ' , url.search);
         
             const searchParams = new URLSearchParams({stream: url.pathname.slice(1), uid: uid});
             
@@ -448,7 +450,7 @@ module.exports = {
             realTimeNowPlaying = '';
             currentNowPlaying = NowPlayingUrl +'/' + stationKey;
         }
-        console.log('Now playing URL: ' , currentNowPlaying, ', real time: ', !(realTimeNowPlaying==''));
+        if (debug) console.log('Now playing URL: ' , currentNowPlaying, ', real time: ', !(realTimeNowPlaying==''));
         return streamUrl;
     },
     
@@ -504,7 +506,7 @@ module.exports = {
                         });
                 } else {
                     // Shouldn't really happen unless there is an issue with the service...
-                    console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
+                    if (debug) console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
                     this.getNowPlayingDetails(currentNowPlaying)
                         .then(song => {
 //                                console.log(JSON.stringify(song)); 
@@ -611,7 +613,7 @@ module.exports = {
 //                    console.log('XSRF-TOKEN cookie: ', XSRFtoken);
 //
                     //cookieJar.add(response.headers['set-cookie'][0]);
-//                    console.log('Cookie jar: ',JSON.stringify(cookieJar));
+//                    if (debug) console.log('Cookie jar: ',JSON.stringify(cookieJar));
                     unirest.post(targetstep2)
                         .header('Accept', 'application/json, text/plain, */*')
                         .header('Referer', targetstep1)
@@ -627,7 +629,7 @@ module.exports = {
                             "password": password
                         })
                         .then((response) => {
-//                            console.log('Step2 response: ', JSON.stringify(response));
+//                            if (debug) console.log('Step2 response: ', JSON.stringify(response));
                             if (response.status === 200){
                                 // Successfully logged in
 //                                console.log('All Cookies: ',JSON.stringify(bauerCookies));
@@ -699,7 +701,7 @@ module.exports = {
             .header('User-Agent', 'curl/7.74.0')
             .header('cookie', bauerCookies)
             .then((response) => {
-                console.log('Response: ' ,JSON.stringify(response));
+                if (debug) console.log('Response: ' ,JSON.stringify(response));
             });
         return defer.promise;
     },
