@@ -661,6 +661,12 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     return defer.promise;
 };
 
+/**
+* Standard function for searching this music service
+
+ * @param {type} query
+ * @returns {.libQ@call;defer.promise} 
+ * */
 ControllerBauerRadio.prototype.search = function (query) {
     var self = this;
     var defer = libQ.defer();
