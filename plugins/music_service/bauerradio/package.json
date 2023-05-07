@@ -1,6 +1,6 @@
 {
 	"name": "bauerradio",
-	"version": "0.3.0",
+	"version": "0.4.0",
 	"description": "bauerradio.fm plugin for Volumio2",
 	"main": "index.js",
 	"scripts": {

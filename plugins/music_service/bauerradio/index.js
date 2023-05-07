@@ -661,6 +661,59 @@ ControllerBauerRadio.prototype.getStreamUrl = function (curUri) {
     return defer.promise;
 };
 
+ControllerBauerRadio.prototype.search = function (query) {
+    var self = this;
+    var defer = libQ.defer();
+
+    let list = [];
+    let queryStr = query.value.toLowerCase();
+    bRadio.getLiveStations()
+        .then((response) => {
+            let stationList = [];
+            response.forEach((value, key) => { 
+                if (value['name'].toLowerCase().includes(queryStr))
+                stationList.push({
+                    "type": "webradio",
+                    "title": value['name'],
+                    "albumart": value['albumart'],
+                    "uri": `BauerRadio://stations/${key}`,
+                    "service":"bauerradio"
+                });
+            });
+            list.push({
+                type: 'title',
+                title: 'BauerRadio stations', // + self.commandRouter.getI18nString('COMMON.SEARCH_ARTIST_SECTION'),
+                availableListViews: ["list", "grid"],
+                items: stationList
+            });
+            // also check brands
+            let brandItems = [];    
+            bRadio.getBrands()
+                .then((response) => {
+                    response.forEach((value, key) => { 
+                        if (value['name'].toLowerCase().includes(queryStr))
+                            brandItems.push({
+                                "type": "item-no-menu",
+                                "title": value['name'],
+                                "albumart": value['albumart'],
+                                "uri": `BauerRadio://brands/${key}`,
+                                "service":"bauerradio"
+                        });
+                    });
+                    list.push({
+                        type: 'title',
+                        title: 'BauerRadio brands', // + self.commandRouter.getI18nString('COMMON.SEARCH_ARTIST_SECTION'),
+                        availableListViews: ["list", "grid"],
+                        items: brandItems
+                    });    
+                    defer.resolve(list);        
+                })
+                .fail(() => defer.resolve(list));
+        })
+        .fail(() => defer.reject(''));
+    return defer.promise;
+};
+
 /**
 * Standard method called to start playback of a music service
 
