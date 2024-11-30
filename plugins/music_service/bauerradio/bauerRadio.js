@@ -47,7 +47,7 @@ const currentUser = {
     premiumExpiresAt : 0
 };
 
-let debug = 1;
+let debug = 0;
 
 // ======================= START OF MODULE EXPORT
 module.exports = {
@@ -445,7 +445,7 @@ module.exports = {
         
         if (streamUrl.startsWith(premiumStreamBase) && uid) {
             const url = new URL(streamUrl);
-            if (debug) console.log('Stream ID: ', url.pathname.slice(1) , ' , Search: ' , url.search);
+            if (debug) console.log('[BauerRadio] Stream ID: ', url.pathname.slice(1) , ' , Search: ' , url.search);
         
             const searchParams = new URLSearchParams({stream: url.pathname.slice(1), uid: uid});
             
@@ -458,7 +458,7 @@ module.exports = {
             currentNowPlaying = NowPlayingUrl +'/' + stationKey;
             currentNowPlaying = EventUrl +'/' + stationKey + '/now/1';
         }
-        if (debug) console.log('Now playing URL: ' , currentNowPlaying, ', real time: ', !(realTimeNowPlaying==''));
+        if (debug) console.log('[BauerRadio] Now playing URL: ' , currentNowPlaying, ', real time: ', !(realTimeNowPlaying==''));
         return streamUrl;
     },
     
@@ -505,7 +505,7 @@ module.exports = {
         if (realTimeNowPlaying) {
             this.getNowPlayingDetails(realTimeNowPlaying)
             .then(song => {
-//                    console.log(JSON.stringify(song)); 
+                if (debug > 2) console.log(JSON.stringify(song)); 
                 if (song.url){
                     this.getEventDetails(song.url)
                         .then(song => {
@@ -514,7 +514,7 @@ module.exports = {
                         });
                 } else {
                     // Shouldn't really happen unless there is an issue with the service...
-                    if (debug) console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
+                    if (debug) console.log('[BauerRadio] Empty real-time metadata, falling back to standard data'); 
                     //this.getNowPlayingDetails(currentNowPlaying)
                     this.getNowPlayingEventDetails(currentNowPlaying)
                         .then(song => {
@@ -526,7 +526,7 @@ module.exports = {
         } else {
             this.getNowPlayingDetails(currentNowPlaying)
             .then(song => {
-//                    console.log(JSON.stringify(song)); 
+                if (debug > 2) console.log(JSON.stringify(song)); 
                 defer.resolve(song);
             });    
         }
@@ -580,7 +580,7 @@ module.exports = {
             .header('Referer', 'https://planetradio.co.uk/')
             .header('Origin', 'https://planetradio.co.uk/')
             .then((response) => {
-                if (debug > 2) console.log(JSON.stringify(response));
+                if (debug > 1) console.log(JSON.stringify(response));
                 if (response && response.status === 200) {
                     // not updated yet, as not really working so far...
                     let eventDetails = response.body;

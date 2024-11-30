@@ -70,6 +70,7 @@ ControllerBauerRadio.prototype.onVolumioStart = function () {
     this.config = new (require('v-conf'))();
     this.config.loadFile(configFile);
     this.debug = this.config.get('debugLevel', 0);
+    bRadio.setDebugLevel(this.debug);
 
     defer.resolve('');
 
@@ -919,6 +920,7 @@ ControllerBauerRadio.prototype.saveAccountCredentials = function (settings) {
 
     self.debug = parseInt(data['debugLevel']) || 0;
 	self.config.set('debugLevel', self.debug);
+    bRadio.setDebugLevel(self.debug);
 	defer.resolve();
 	
     self.commandRouter.pushToastMessage('success', "Saved settings", "Set debug level to " + self.debug);
