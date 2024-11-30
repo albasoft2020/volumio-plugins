@@ -7,6 +7,7 @@ const premiumStreamBase = 'https://stream.on.revma.com';
 const NowPlayingPremiumUrl = new URL('https://stream.on.revma.com/api/user/command/now_playing');
 const apiBase = 'https://listenapi.planetradio.co.uk/api9.2/';
 const NowPlayingUrl = apiBase + 'nowplaying';
+const EventUrl = apiBase + 'events';
 
 const stations = new Map();
 const brands = new Map();
@@ -46,11 +47,16 @@ const currentUser = {
     premiumExpiresAt : 0
 };
 
-const debug = false;
+let debug = 1;
 
 // ======================= START OF MODULE EXPORT
 module.exports = {
 // ======================= Tools (called from outside)
+    // Set bebugging level (either on or off ;-))
+    setDebugLevel: function (dbgLevel) {
+        debug = dbgLevel;
+    },
+
 
     // Get a map of BauerRadio live stations
     getLiveStations: function (refresh) {
@@ -63,7 +69,7 @@ module.exports = {
         }
         else {
             let premium = "";
-            if (premiumUser) premium = "?premium=1"
+            if (premiumUser) premium = "?premium=1";
             stations.clear();
             brands.clear();
 //            console.log('Requesting info through web. Include premium stations: ' + premiumUser);
@@ -445,10 +451,12 @@ module.exports = {
             
             NowPlayingPremiumUrl.search = searchParams.toString();
             realTimeNowPlaying = NowPlayingPremiumUrl.href;
-            currentNowPlaying = NowPlayingUrl +'/' + stationKey;
+            //currentNowPlaying = NowPlayingUrl +'/' + stationKey;
+            currentNowPlaying = EventUrl +'/' + stationKey + '/now/1';
         } else {
             realTimeNowPlaying = '';
             currentNowPlaying = NowPlayingUrl +'/' + stationKey;
+            currentNowPlaying = EventUrl +'/' + stationKey + '/now/1';
         }
         if (debug) console.log('Now playing URL: ' , currentNowPlaying, ', real time: ', !(realTimeNowPlaying==''));
         return streamUrl;
@@ -507,7 +515,8 @@ module.exports = {
                 } else {
                     // Shouldn't really happen unless there is an issue with the service...
                     if (debug) console.log('Bauerradio: Empty real-time metadata, falling back to standard data'); 
-                    this.getNowPlayingDetails(currentNowPlaying)
+                    //this.getNowPlayingDetails(currentNowPlaying)
+                    this.getNowPlayingEventDetails(currentNowPlaying)
                         .then(song => {
 //                                console.log(JSON.stringify(song)); 
                             defer.resolve(song);
@@ -561,6 +570,39 @@ module.exports = {
         return defer.promise;
     },
     
+    // Get nowPlaying details from event URL (nowPlaying api call stop working relyiably at the end of Nov. '24?)
+    getNowPlayingEventDetails: function (eventUrl) {
+
+        var defer=libQ.defer();
+
+        unirest
+            .get(eventUrl)
+            .header('Referer', 'https://planetradio.co.uk/')
+            .header('Origin', 'https://planetradio.co.uk/')
+            .then((response) => {
+                if (debug > 2) console.log(JSON.stringify(response));
+                if (response && response.status === 200) {
+                    // not updated yet, as not really working so far...
+                    let eventDetails = response.body;
+                    if (eventDetails[0] != null) {
+                        let song = { 
+                            'artist' : eventDetails[0].nowPlayingArtist,
+                            'title': eventDetails[0].nowPlayingTrack,
+                            'duration' : eventDetails[0].nowPlayingDuration,
+                            'albumart' : eventDetails[0].nowPlayingImage,
+                            'timestamp' : Math.floor(new Date(eventDetails[0].nowPlayingTime).getTime() / 1000)
+                        };
+                        defer.resolve(song);
+                    } else {
+                        defer.resolve(eventDetails);
+                    }
+                } else {
+                    defer.reject(new Error('Failed to retrieve event data from URL: ' + eventUrl));
+                }
+            });
+        return defer.promise;
+    },
+    
     setUserID: function(id) {
         let defer=libQ.defer();
         
@@ -601,7 +643,7 @@ module.exports = {
 //            .header('Sec-Fetch-User', '?1')
 //            .header('Cache-Control', 'no-cache')
             .then((response) => {
-//                console.log('Response headers: ' ,JSON.stringify(response.headers));
+                if (debug > 2) console.log('Response headers: ' ,JSON.stringify(response.headers));
                 if (response && response.status === 200 && response.cookies && 'XSRF-TOKEN' in response.cookies) {
 //                    // the following does NOT work, as it only sees the empty XSRF-TOKEN:
 //                    console.log('Cookies: ',JSON.stringify(response.cookies));
@@ -629,7 +671,7 @@ module.exports = {
                             "password": password
                         })
                         .then((response) => {
-//                            if (debug) console.log('Step2 response: ', JSON.stringify(response));
+                            if (debug > 2) console.log('Step2 response: ', JSON.stringify(response));
                             if (response.status === 200){
                                 // Successfully logged in
 //                                console.log('All Cookies: ',JSON.stringify(bauerCookies));
